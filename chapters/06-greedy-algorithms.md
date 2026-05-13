@@ -1,161 +1,258 @@
-# Greedy Algorithms
+# Chapter 6 — Greedy Algorithms
 
-## TL;DR
+*The locally best choice, taken at every step, sometimes wins everything. The question is when.*
 
-A greedy algorithm makes the locally best choice at each step and never reconsiders. Reach for this chapter when a problem has the structure of repeated independent choices and you suspect — or can prove — that local optimality compounds into global optimality. After consulting it, you can recognize when greedy is provably optimal (matroids and exchange arguments), when it gives a known approximation ratio, and when it is a heuristic with no guarantee at all.
+---
 
-## Recognition pattern
+Here is a puzzle that looks almost too simple to be interesting.
 
-You face a sequence of decisions, each with a local cost or value, and you want a globally optimal outcome. The signal that greedy might apply: the problem has *optimal substructure* — an optimal solution contains optimal solutions to subproblems — and a *greedy choice property* — there exists a locally optimal choice that extends to a global optimum.
+You have a list of meetings. Each meeting has a start time and an end time. You want to attend as many meetings as possible, but you can only be in one place at a time — no two meetings you attend can overlap. Which meetings do you pick?
 
-Three concrete signals worth checking. *Sortable input.* Many greedy algorithms work by sorting (intervals by end time, edges by weight, characters by frequency) and then scanning. If your problem admits a useful sort order, greedy is worth trying. *Matroid structure.* The problem can be cast as picking a maximum-weight independent set in a matroid; matroid theory guarantees greedy is optimal. *Exchange argument available.* You can argue that any optimal solution can be transformed into the greedy solution without losing value.
+Think about it for a moment before reading on. The meetings are not weighted. You don't care which meetings you attend, only how many. You want the count to be as large as it can be.
 
-A signal that greedy is *not* the right tool: the problem has overlapping subproblems whose optimal solutions depend on each other. That is the dynamic-programming shape (Chapter 8). A signal that greedy is the *wrong* tool: a small example exists where local optima compound into a globally suboptimal result. The 0/1 knapsack with arbitrary weights and values is the canonical case where greedy fails and DP succeeds.
+Most people's first instinct is: start as early as possible, or pick the shortest meetings. Both instincts are wrong, and in a specific way that tells you something deep about what greedy algorithms actually are.
 
-The misconception engaged in §8 is the inverse — the belief that greedy is sloppy and DP is the rigorous one. When greedy is provably optimal, it is fully rigorous, and it costs less.
+---
 
-## What you need to know first
+## What a greedy algorithm actually is
 
-This chapter assumes Big O (Chapter 2) and basic graph terminology (Chapter 5) for MST examples. Union-Find (Chapter 3 §6) is referenced in Kruskal's MST algorithm. For the contrast with dynamic programming, see Chapter 8. For approximation-ratio analysis of greedy algorithms applied to NP-hard problems, the full treatment is in Chapter 11; this chapter introduces vertex cover and set cover briefly.
+A greedy algorithm makes the locally best choice at each step and never looks back. That's the whole definition. No recalculation, no revisiting, no comparing alternatives. Commit and move on.
 
-## What greedy means
+The question — the only question that matters — is whether making the locally best choice at each step guarantees the globally best outcome at the end. Sometimes it does. When it does, the greedy algorithm is provably correct, and it is usually the fastest correct algorithm available. When it doesn't, the greedy algorithm is a heuristic: it may produce a good solution, or a poor one, or the worst possible one, and without additional analysis you cannot tell which.
 
-A greedy algorithm builds a solution by making the locally best choice at each step, never revisiting prior choices. The two properties a problem must have for a greedy algorithm to be provably optimal:
+This chapter is about the difference.
 
-**Greedy choice property.** A globally optimal solution can be obtained by making a locally optimal (greedy) choice at each step. Equivalently: at each decision point, there exists an optimal solution that includes the greedy choice.
+---
 
-**Optimal substructure.** An optimal solution to the problem contains optimal solutions to its subproblems. After making a greedy choice, the remaining problem is a smaller instance whose optimal solution combined with the greedy choice gives the global optimum.
+## The meeting puzzle, resolved
 
-Without both properties, a greedy algorithm is a heuristic — it may produce a good solution, but no proof guarantees optimality. With both, it is provably optimal and usually the cheapest correct algorithm.
+Back to the meetings. What's the right greedy choice?
 
-## Interval scheduling — the canonical proof template
+Not earliest start. Here is the counterexample. Suppose there is one meeting from 9 AM to 6 PM, and eight short meetings: 9-10, 10-11, 11-12, 12-1, 1-2, 2-3, 3-4, 4-5. Earliest start picks the 9-to-6 meeting and stops. Count: 1. But you could attend all eight short ones. Count: 8. The early-start heuristic fails badly because it commits to a long meeting that blocks everything else.
 
-The interval scheduling problem: given `n` intervals `[s₁, e₁], ..., [sₙ, eₙ]`, select the largest subset of pairwise non-overlapping intervals.
+Not shortest duration. Three meetings: 8-10, 9-11, 10-12. Shortest duration picks 9-11, which overlaps with both others, leaving count 1. But 8-10 and 10-12 don't overlap: count 2. Picking the shortest meeting picked the wrong meeting.
 
-The optimal greedy choice is **earliest finish time**: sort intervals by end time, scan left to right, take each interval that does not overlap the most recently selected one. Time: `O(n log n)` for the sort plus `O(n)` for the scan. Optimal subset size: maximum.
+<!-- → IMAGE: three-panel timeline diagram — panel 1 shows earliest-start picking the long 9–6 block and stopping (8 short meetings grayed out, count = 1); panel 2 shows shortest-duration picking the middle 9–11 block and blocking both neighbors (count = 1); panel 3 shows earliest-finish selecting all 8 short non-overlapping meetings (count = 8); each panel labels the strategy and the final count so the failure modes are visually immediate -->
 
-Why earliest finish time? An *exchange argument*. Suppose an optimal solution `O` exists that does not include the earliest-finishing interval `g₁`. Let `o₁` be the first interval in `O` (sorted by start time). Replace `o₁` with `g₁`. The replacement does not overlap any other interval in `O` because `g₁` ends no later than `o₁` (by the greedy choice) and the next interval in `O` starts after `o₁` ends. So `O'` = `O` with `o₁` replaced by `g₁` is also optimal. Repeat the argument for the remaining intervals; the greedy solution is constructed exchange by exchange from `O` without ever reducing the count.
+The right choice is **earliest finish time**. Sort the meetings by when they end. Scan through them in that order. Take each meeting that doesn't conflict with the one you most recently selected. That's it.
 
-Why not earliest start time? Counterexample: one long interval `[0, 100]` and ten short ones `[1, 2], [3, 4], ..., [19, 20]`. Earliest start picks the long one and stops, count 1. Earliest finish picks all ten short ones, count 10. The earliest-start heuristic fails because committing to a long interval blocks many short ones.
+Why does this work when the others don't? The answer is an exchange argument, and the exchange argument is the central idea in all of greedy algorithm analysis.
 
-Why not shortest interval? Counterexample: three intervals `[0, 10]`, `[9, 11]`, `[10, 20]`. Shortest picks `[9, 11]`, blocking the other two, count 1. Earliest finish picks `[0, 10]` then `[10, 20]`, count 2.
+---
 
-The exchange argument is the central proof template for greedy optimality. When you see one, the algorithm is rigorously correct.
+## The exchange argument
 
-## Interval partitioning — counting resources
+Here is how to prove that earliest-finish-time is optimal. Suppose there is an optimal solution — some set of meetings that achieves the maximum possible count. Call it *O*. If the greedy solution *G* equals *O*, we're done. If not, there must be some first point where they differ.
 
-A variant: schedule all intervals across the minimum number of resources (machines, classrooms, lecture halls), where each resource handles non-overlapping intervals.
+Let *g₁* be the first meeting the greedy algorithm selects — the one with the earliest finish time overall. Now look at *O*. Let *o₁* be the first meeting in *O* (sorted by start time). If *o₁* is not *g₁*, ask: what happens if we replace *o₁* with *g₁* in *O*?
 
-Greedy: sort intervals by start time; assign each interval to any available resource (one whose last interval has finished); if none is available, create a new one. Time: `O(n log n)`.
+Because *g₁* has the earliest finish time of any meeting, it finishes no later than *o₁*. And since the second meeting in *O* starts after *o₁* ends, it also starts after *g₁* ends. So the replacement doesn't create any new conflicts. The modified solution *O'* has the same number of meetings as *O* — it's still optimal — and it now agrees with the greedy solution on the first choice.
 
-The minimum number of resources equals the **depth** of the schedule — the maximum number of intervals overlapping at any point in time. This is a lower bound (you cannot do with fewer resources than the simultaneous count at peak), and the greedy algorithm achieves it.
+Apply this argument again to the second choice, then the third, and so on. Each exchange preserves optimality. After at most *n* exchanges, *O* has been transformed into *G* without ever reducing the count. Therefore *G* is optimal.
 
-The lower-bound argument is the second canonical template. Identify a structural lower bound, design a greedy algorithm that meets it, prove the match.
+This is the template. Every provably correct greedy algorithm has an argument with this shape: any optimal solution can be transformed, one exchange at a time, into the greedy solution, without getting worse. If you can write that argument, the algorithm is correct. If you cannot, you don't yet know whether it's correct — and you should assume it isn't until you have a proof or a counterexample.
 
-## Minimum spanning trees — three greedy algorithms, all optimal
+<!-- → INFOGRAPHIC: step-by-step exchange argument diagram for interval scheduling — row 1 shows optimal solution O with o₁ as its first interval; row 2 shows O' with o₁ replaced by g₁ (g₁ highlighted, same total count); row 3 shows the process repeating for o₂→g₂; final row shows G = O after all exchanges; the visual should make the "one swap at a time, count never decreases" logic scannable without reading the prose -->
 
-A minimum spanning tree (MST) of a connected weighted undirected graph is a subset of edges that connects all vertices with minimum total weight. Three greedy algorithms, all proven optimal by different exchange arguments.
+---
 
-**Kruskal's algorithm.** Sort edges by weight ascending. For each edge in order, add it to the MST unless it creates a cycle (Union-Find detects cycles in `O(α(n))` amortized; see Chapter 3 §6). Time: `O(E log E)`. Wins on sparse graphs.
+## The lower-bound template
 
-**Prim's algorithm.** Start from any vertex. Maintain a priority queue of edges from the tree to non-tree vertices. Repeatedly extract the cheapest edge whose other endpoint is not yet in the tree, add it. Time: `O(E log V)` with a binary heap (Chapter 3 §4). Wins on dense graphs.
+The exchange argument is one proof template. There's a second one, complementary to it: the lower bound argument.
 
-**Borůvka's algorithm.** In each phase, every component finds its cheapest outgoing edge; merge components along those edges. Time: `O(E log V)`. The oldest of the three (Borůvka, 1926) [verify]; useful in parallel implementations because per-component work is independent.
+Consider a variant of the meeting problem. Now you don't pick which meetings to attend — you have to schedule *all* of them, and you want to know the minimum number of rooms you need. Each room can only host one meeting at a time.
 
-The correctness of all three rests on the **cut property**: for any cut of the graph (a partition of vertices into two sets), the cheapest edge crossing the cut belongs to some MST. This is an exchange argument in graph form: if an MST excludes the cheapest cut-crossing edge, swap any heavier crossing edge for it; the result is still a spanning tree, with smaller total weight, contradicting MST-ness.
+The greedy algorithm: sort all meetings by start time. For each meeting, assign it to any room that's currently free. If no room is free, open a new room. Time: *O(n log n)*.
 
-The MST problem fits a richer abstraction: **graphic matroid**. A matroid is a structure that generalizes "independent set" — in this case, a set of edges is independent if it forms a forest (no cycles). The fundamental matroid theorem: greedy is optimal on the maximum-weight independent set problem if and only if the structure is a matroid. Kruskal applied to the graphic matroid is the canonical example. Other matroids — uniform matroid, partition matroid, transversal matroid — yield greedy-optimal algorithms for their respective independent-set problems.
+How do you know this is optimal? There's a structural lower bound that makes it obvious. At any moment in time, if *k* meetings are happening simultaneously, you cannot possibly use fewer than *k* rooms — no matter what you do, no matter how clever the assignment. The peak simultaneous count is a hard lower bound on the room count.
 
-## Huffman coding — frequency-driven greed
+Now ask: does the greedy algorithm ever do worse than this lower bound? No. The greedy algorithm opens a new room only when every existing room is occupied, which means the current meeting overlaps with every meeting in progress, which means the depth has just increased by one. The greedy algorithm adds exactly one room per unit of increase in depth, and never more. So its room count exactly equals the depth.
 
-Huffman coding builds an optimal prefix-free binary code for a set of symbols with given frequencies. The greedy step: repeatedly combine the two least-frequent nodes into a single internal node whose frequency is the sum, until one tree remains.
+The proof structure: identify a structural lower bound, design a greedy algorithm that meets it, and prove the match. The greedy solution achieves what no algorithm can improve on.
 
-Time: `O(n log n)` with a priority queue (Chapter 3 §4). The output is an optimal prefix-free code in the sense of minimum expected code length given symbol frequencies.
+<!-- → CHART: timeline chart of interval partitioning — horizontal bars showing meetings assigned to rooms (rows), with a vertical "depth" indicator at the peak-overlap moment; caption should highlight that the number of rows equals the peak depth, making the lower-bound argument visible as a geometric fact rather than an algebraic one -->
 
-Why combine the least-frequent nodes? The proof is again an exchange argument: in any optimal prefix tree, the two deepest leaves can be made siblings (depth and sibling structure can be swapped without changing total weighted depth), and swapping them with the two least-frequent symbols can only decrease (never increase) total cost.
+---
 
-Huffman is the foundation of practical compression schemes (DEFLATE in gzip and PNG, JPEG entropy coding) [verify], usually combined with other techniques (Lempel-Ziv dictionary compression in DEFLATE). The greedy core is the same; the wrapping varies.
+## Minimum spanning trees — three algorithms, one principle
 
-## When greedy approximates rather than solves
+Connect a set of cities by roads. You want to connect them all, building the minimum total road length. This is the minimum spanning tree problem.
 
-When optimal substructure or the greedy choice property fails, greedy can still earn its place by giving a known approximation ratio. Two examples introduced here; the full ratio analysis lives in Chapter 11.
+Three greedy algorithms solve it, all optimally, all provably.
 
-**Vertex cover (greedy 2-approximation).** Find a minimum set of vertices that covers every edge. Greedy strategy: repeatedly pick any uncovered edge, add both endpoints to the cover, remove all edges incident to either endpoint. The result is at most twice the optimal size. Worse than a more careful approximation but simple, fast, and acceptable when "within a factor of 2" is good enough.
+**Kruskal's algorithm.** Sort all edges by weight. Scan through them in ascending order. Add each edge to the growing tree unless it would create a cycle. (Use Union-Find from Chapter 3 to detect cycles efficiently.) The algorithm adds edges greedily by cost, stopping when the graph is connected.
 
-**Set cover (greedy `ln n`-approximation).** Find a minimum subcollection of sets whose union is the universe. Greedy: repeatedly pick the set that covers the most uncovered elements. The result is at most `H_n ≈ ln n` times optimal, where `H_n` is the `n`-th harmonic number. Tight: this is known to be the best polynomial-time approximation possible unless P = NP (Feige 1998) [verify].
+**Prim's algorithm.** Start from any vertex. Maintain a priority queue of edges from the growing tree to vertices not yet in it. Repeatedly extract the cheapest such edge and add its endpoint. The tree grows outward from its current boundary, always taking the cheapest available extension.
 
-These are not provably optimal — they are provably bounded. The distinction matters and is the practitioner-relevant content of approximation algorithms (Chapter 11).
+**Borůvka's algorithm.** Look at each component independently. Every component finds its cheapest outgoing edge — the cheapest edge that crosses to another component. Merge all components along those edges simultaneously. Repeat until one component remains. The oldest of the three, due to Borůvka in 1926, and the most naturally parallelizable.
 
-## Decision rules
+All three are correct, and their shared correctness rests on one property: the **cut property**. Take any cut of the graph — any partition of the vertices into two sets. The cheapest edge crossing the cut belongs to some minimum spanning tree.
 
-| Problem signature | Greedy strategy |
-| --- | --- |
-| Maximum compatible intervals | Earliest finish time |
-| Minimum number of resources | Earliest start time + assign to free resource |
-| Minimum spanning tree, sparse graph | Kruskal |
-| Minimum spanning tree, dense graph | Prim |
-| Minimum spanning tree, parallel | Borůvka |
-| Optimal prefix-free code | Huffman (least-frequent merge) |
-| Maximum-weight independent set in a matroid | Generic greedy |
-| Vertex cover (heuristic, 2-approximation) | Take both endpoints of any uncovered edge |
-| Set cover (heuristic, `ln n`-approximation) | Take set covering the most uncovered elements |
-| Coin change, canonical denominations (US, EUR) | Take largest denomination ≤ remaining |
-| Coin change, arbitrary denominations | DP, not greedy (greedy fails) |
-| 0/1 knapsack | DP, not greedy (greedy fails) |
-| Fractional knapsack | Greedy by value-density |
+The proof is an exchange argument. Suppose a minimum spanning tree *T* doesn't include the cheapest crossing edge *e*. Then *T* must cross the cut using some other edge *f*, which is heavier. Swap *f* for *e*: remove *f*, add *e*. The result is still a spanning tree (it still connects all vertices), and its total weight decreased by the weight of *f* minus the weight of *e*, which is positive. That contradicts *T* being minimal. So *T* must include *e*.
 
-## Worked example — meeting room scheduling
+Each of the three algorithms is a different way of applying the cut property repeatedly. Kruskal applies it to the cuts defined by connected components. Prim applies it to the cut between the current tree and everything outside it. Borůvka applies it to every component simultaneously. The algebra is the same; the traversal order is different.
 
-A 200-person organization runs roughly 800 meetings per day across 40 conference rooms [verify]. Each meeting has a known start and end time when it is booked. The question: given today's bookings, what is the minimum number of rooms needed?
+<!-- → IMAGE: three small graph diagrams side by side — Kruskal: edges sorted by weight with the next-cheapest non-cycle edge highlighted; Prim: current tree shaded, cheapest frontier edge highlighted; Borůvka: each component with its cheapest outgoing edge highlighted simultaneously; captions name the cut each algorithm is implicitly applying -->
 
-This is interval partitioning. The greedy algorithm is earliest-start-time-with-resource-reuse: sort meetings by start time; for each meeting, assign it to any room whose previous meeting has ended; if none is free, open a new room. The number of rooms used equals the schedule depth — the maximum simultaneous meeting count at any moment.
+---
 
-Implementation. A min-heap of "next free time" per room, sized as needed. For each meeting, peek at the heap's minimum; if `min_free_time ≤ meeting.start`, reuse that room (pop, push meeting's end time). Otherwise add a new room (push meeting's end time). Time: `O(n log n)` for the sort plus `O(n log k)` for the heap operations, where `k` is the room count.
+## Huffman coding — greed at the bit level
 
-Result: the algorithm returns the optimal room count, and the assignment is constructive — you know which meeting goes in which room. The optimality is provable by the depth lower bound: the room count cannot be smaller than the simultaneous-meeting peak; the greedy algorithm achieves the peak.
+Suppose you are transmitting a text over a channel. The text uses a small alphabet — say, six letters: A, B, C, D, E, F — with known frequencies. A encodes 45% of the text, B about 13%, C about 12%, D about 16%, E about 9%, F about 5%. A naïve encoding assigns each letter a 3-bit code (there are 6 symbols, 3 bits gives 8 possibilities). But why give the rare symbols the same code length as the frequent ones? Assign shorter codes to more frequent symbols and you transmit fewer bits overall.
 
-Why earliest-start? The schedule is processed in time order; assigning the next meeting to a free room (or opening a new one if none is free) cannot waste rooms. Earliest-finish is the wrong order here: it can leave a room idle when a later-starting meeting could have used it.
+The constraint: no code can be a prefix of another. If A is 0 and B is 01, then when you see 0 in the stream you can't tell whether it's A or the start of B. Prefix-free codes are those where no codeword is a prefix of any other.
 
-The same problem with different constraints drifts toward heuristic territory. *If meetings have fixed room preferences* (the AV-equipped room, the executive boardroom), the problem becomes a constraint-satisfaction problem and greedy can fail. *If meetings can be rescheduled within a window*, the problem becomes a scheduling-with-flexibility problem, often NP-hard. *If meetings have priorities and rooms have capacities*, the problem becomes a matching or flow problem (Chapter 9). The same opening question can have very different correct answers depending on what is fixed and what is flexible.
+Huffman's greedy algorithm builds the optimal prefix-free code. Represent each symbol as a leaf node with weight equal to its frequency. Repeatedly take the two nodes with the smallest weights, create a new internal node whose weight is their sum, and attach them as its children. Repeat until one tree remains. The codeword for each symbol is the path from root to that leaf, with left branches as 0 and right branches as 1.
 
-The lesson: greedy with a clean exchange argument is a precise tool. As constraints grow, the tool's domain shrinks. Be specific about the constraints; the algorithm follows.
+Huffman's greedy algorithm builds the optimal prefix-free code. Represent each symbol as a leaf node with weight equal to its frequency. Repeatedly take the two nodes with the smallest weights, create a new internal node whose weight is their sum, and attach them as its children. Repeat until one tree remains. The codeword for each symbol is the path from root to that leaf, with left branches as 0 and right branches as 1.
 
-## Failure modes — when "greedy is sloppy" misleads
+<!-- → IMAGE: step-by-step Huffman tree construction for the six-symbol example (A=45, B=13, C=12, D=16, E=9, F=5) — four panels showing the state of the priority queue and partial tree after each merge step; final panel shows the complete tree with codewords labeled on edges; student should see how F and E (lowest frequencies) end up deepest and share a parent -->
 
-The misconception engaged: "Greedy algorithms are sloppy; DP is the rigorous one."
+Why does this work? The proof is another exchange argument, but it needs a preliminary observation: in any optimal prefix tree, the two symbols with the lowest frequencies have the longest codewords — they live at the greatest depth. If they didn't, you could swap them with whatever is deepest, decreasing the total weighted path length, contradicting optimality.
 
-This is wrong on three counts.
+Given that observation: the two least-frequent symbols should be siblings (children of the same parent), as deep as possible. The greedy algorithm ensures this by combining them first. After combining, the internal node takes their place with their combined frequency, and the problem reduces to the same problem on a smaller alphabet. The exchange argument applies at each step: the greedy combination is always includable in an optimal tree.
 
-**Greedy is rigorous when the matroid/exchange-argument structure holds.** Interval scheduling, MST, Huffman, fractional knapsack — all are provably optimal greedy algorithms. The proof is mathematical and complete. Calling them sloppy is a category error: they are exactly as rigorous as the DP solutions to problems like 0/1 knapsack or edit distance, and they are cheaper.
+Huffman coding is the foundation of real compression systems. DEFLATE, used in gzip and PNG, builds Huffman codes on top of Lempel-Ziv dictionary compression. JPEG uses Huffman coding in its entropy-coding stage. The greedy core is exactly what Huffman described; everything else is engineering around it.
 
-**DP is sometimes a hammer where greedy would do.** A practitioner who reaches for DP on every optimization problem will write `O(n²)` or `O(n³)` solutions where `O(n log n)` greedy suffices. The interval scheduling problem solved by DP is a classic over-engineering case.
+---
 
-**Greedy can fail invisibly.** This is the legitimate concern. When the matroid structure is absent, greedy may produce a solution that looks good but is suboptimal. Three concrete cases.
+## The matroid abstraction
 
-*Coin change with arbitrary denominations.* For US coins (1, 5, 10, 25), greedy works. For arbitrary denominations like (1, 6, 10), greedy fails: making 12 cents greedily uses 10 + 1 + 1 (three coins), but optimal is 6 + 6 (two coins). Greedy is the wrong tool; DP is correct.
+There is a pattern running through all of these problems. Interval scheduling, MST, Huffman coding, fractional knapsack — they all share a structure that makes greedy provably optimal. The name for that structure is a **matroid**.
 
-*0/1 knapsack.* Pick a subset of items, each with a weight and value, maximizing value subject to a weight bound. Greedy by value-density (value/weight) fails: it can pick a high-density small item that blocks a low-density large item that fits and is more valuable. DP solves it in `O(nW)` time.
+A matroid is a set system with an independence property. You have a ground set of elements (meetings, edges, symbols) and a collection of "independent sets." The independent sets satisfy three axioms: the empty set is independent; every subset of an independent set is independent; and if two independent sets have different sizes, some element of the larger one can be added to the smaller one and the result is still independent.
 
-*Tour planning (traveling salesman).* Nearest-neighbor heuristic is `O(n²)` and easy to implement, but it can produce tours arbitrarily far from optimal in the worst case. TSP with the metric property has provably-bounded approximations (Chapter 11), but the simple greedy is not one of them.
+The punchline, which took mathematicians decades to formalize but once stated seems almost inevitable: **a greedy algorithm solves the maximum-weight independent set problem optimally if and only if the structure is a matroid**.
 
-The corrective heuristic: greedy is right when you can write the exchange argument. Not "feels right." Not "has worked on similar problems." Write the argument. If it goes through, the algorithm is correct and likely the cheapest. If it does not, reach for DP (Chapter 8) or approximation analysis (Chapter 11).
+You don't need to know matroid theory to apply greedy correctly. But you do need to know that the structure matters. The question "is greedy optimal here?" is really the question "is this problem a matroid?" — or equivalently, "does the exchange argument go through?" Both are asking the same thing from different directions.
 
-## Cross-references
+---
 
-For Union-Find used by Kruskal, see Chapter 3 §6. For heaps used by Prim, Huffman, and meeting-room scheduling, see Chapter 3 §4. For the contrast with dynamic programming, see Chapter 8. For approximation ratios of vertex cover, set cover, and other NP-hard problems, see Chapter 11. For Dijkstra's algorithm as a greedy shortest-path algorithm, see Chapter 5 §5. For randomized greedy, see Chapter 12.
+## When greedy is wrong
 
-## Companion-page handoffs
+The same instinct that works so well in the problems above fails completely in others, and the failures are not subtle.
 
-Extended catalog of greedy algorithms with proof patterns; matroid theory primer; implementations of Kruskal, Prim, Borůvka, Huffman, interval scheduling, and meeting-room scheduling in Python; counterexample gallery for non-matroid greedy failures; benchmarks comparing greedy against DP on borderline problems. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-6.
+**Coin change with arbitrary denominations.** For US coins — 1¢, 5¢, 10¢, 25¢ — the greedy algorithm works: always take the largest coin that fits in the remaining amount. This is optimal. But change the denominations to 1¢, 6¢, and 10¢, and ask for 12¢. Greedy takes the 10¢ coin, then needs 2¢, but there's no 2¢ coin, so it takes two pennies: three coins total. The optimal solution is two 6¢ coins. Greedy produced the wrong answer, and it's not even close to right.
 
-## What this chapter does not enable
+Why does greedy work for US coins and fail for this denomination set? The US coin system has the matroid property; the 1-6-10 system doesn't. There is no exchange argument for the arbitrary-denomination case. The correct tool is dynamic programming, which we'll reach in Chapter 8.
 
-This chapter does not give a procedure for inventing greedy algorithms for novel problems. The diagnostic move — does the problem fit a matroid? does an exchange argument go through? — is a craft skill that develops with practice. The chapter also does not cover advanced matroid topics (matroid intersection, matroid union, matroid optimization with side constraints), nor does it carry the full ratio analysis for vertex cover and set cover; those live in Chapter 11.
+**The 0/1 knapsack.** You have a bag with a weight limit and a set of items, each with a weight and a value. Pick items to maximize total value without exceeding the weight limit. The greedy temptation: sort by value-per-unit-weight (value density) and take the highest-density items first.
 
-## Capability statement
+This fails. Suppose the bag holds 50 pounds and you have three items: 10 lb for \$60 (density 6), 20 lb for \$100 (density 5), and 30 lb for \$120 (density 4). Greedy takes the 10-lb item, then the 20-lb item, filling 30 lb for \$160. But taking the 20-lb and 30-lb items fills 50 lb for \$220. Greedy missed the best answer.
 
-You can now identify when a problem admits a provably optimal greedy algorithm via matroid structure or exchange argument; apply the canonical greedy algorithms (interval scheduling, interval partitioning, MST trio, Huffman); recognize when greedy gives an approximation rather than an exact answer; and avoid the trap of using greedy where DP is required. The next time a sequence of independent-looking choices arrives, you can write the exchange argument or know to switch tools.
+Notice: if you could take fractions of items, greedy by value density is optimal. You'd take 10 lb at density 6, 20 lb at density 5, then 20 lb out of the 30-lb item at density 4, total value \$60 + \$100 + \$80 = \$240. The fractional version has the matroid structure. The 0/1 version (take it or leave it, no fractions) does not, and requires dynamic programming.
 
+**Nearest-neighbor tour.** Find the shortest route that visits all cities exactly once and returns home. The greedy heuristic: from your current city, go to the nearest unvisited city. This is fast and often produces decent tours. But it can also produce tours that are far from optimal — on adversarially constructed inputs, the nearest-neighbor tour can be arbitrarily worse than optimal. There is no exchange argument. Nearest-neighbor is a heuristic, not an algorithm, in the technical sense.
+
+---
+
+## The approximation middle ground
+
+Some problems sit between "greedy is provably optimal" and "greedy has no guarantees." They are NP-hard — no polynomial-time algorithm is known that always finds the exact optimum — but greedy gives a provably bounded approximation.
+
+**Vertex cover.** Find the smallest set of vertices such that every edge in the graph has at least one endpoint in the set. Greedy strategy: repeatedly pick any uncovered edge and add *both* its endpoints to the cover. The resulting cover is at most twice the size of the optimal cover.
+
+Why twice? The edges picked by the greedy (those that trigger each selection) form a matching — no two of them share an endpoint. Any vertex cover must include at least one endpoint of each matched edge. Since the matched edges are disjoint, the minimum vertex cover has size at least the number of matched edges. The greedy cover has exactly twice that many vertices. Therefore the greedy result is within a factor of 2 of optimal.
+
+This is a proof of approximation ratio, not of optimality. It is rigorous. It guarantees something. But what it guarantees is a bound on how bad the answer can be, not a promise of optimality.
+
+**Set cover.** Cover a universe of *n* elements using the minimum number of sets from a given collection. Greedy: repeatedly pick the set that covers the most uncovered elements. The resulting collection is at most *ln n* times the size of the minimum cover, where *ln n* is the natural logarithm.
+
+This bound is known to be tight: no polynomial-time algorithm can do better than ln *n* approximation on set cover unless P = NP. The greedy algorithm is, in a precise mathematical sense, the best you can do efficiently.
+
+The full treatment of approximation algorithms lives in Chapter 11. The point here is that greedy is not a binary choice between "provably optimal" and "useless." There is a middle register: provably bounded, which is often exactly what practice requires.
+
+<!-- → INFOGRAPHIC: horizontal spectrum from left ("Provably optimal — exchange argument holds") through middle ("Provably bounded — approximation ratio known") to right ("Heuristic — no guarantee"); place labeled examples at each position: interval scheduling / MST / Huffman at left; vertex cover (2×) and set cover (ln n ×) in middle; nearest-neighbor TSP at right; makes the three-way taxonomy scannable -->
+
+---
+
+## The corrective heuristic
+
+Here is the actual decision process, reduced to its core.
+
+When you look at a new optimization problem and wonder whether greedy will work, ask one question: *can I write the exchange argument?* Not "does it feel right." Not "has it worked on similar problems." Not "this looks like the meeting scheduling problem." Write the argument. Suppose an optimal solution exists that doesn't follow the greedy strategy. Show that it can be modified to follow the greedy strategy without becoming worse. If that argument goes through, the algorithm is correct.
+
+If the argument doesn't go through — if there's a step where you can't make the swap without potentially losing value — the algorithm is not provably correct. Find a small counterexample to confirm, then reach for dynamic programming.
+
+The reverse mistake is also real: using dynamic programming on a problem that has a clean exchange argument and could be solved in *O(n log n)* instead of *O(n²)* or *O(n³)*. The interval scheduling problem solved by DP instead of greedy is the canonical example of a practitioner reaching for a heavier tool than necessary. DP is not more rigorous than greedy on problems where both are provably optimal — it is just slower.
+
+Greedy is rigorous when the structure supports it. The structure is not a feeling; it is a proof. If you have the proof, the algorithm is exact. If you don't, you have a heuristic, and you should know which one you have.
+
+---
+
+## What you can do now that you couldn't before
+
+You can look at an optimization problem and ask whether its structure supports a greedy algorithm. You can write the exchange argument for interval scheduling and MST, and you understand why the same argument fails for 0/1 knapsack. You can apply the lower-bound template to interval partitioning. You can implement Kruskal, Prim, Huffman, and earliest-finish-time interval scheduling, and you know why each one is correct rather than just knowing that it is.
+
+The next chapter turns to dynamic programming — the tool for when optimal substructure is present but the greedy choice property is not, when the choices aren't independent and the decision at one step depends on what you'll do at the next. Where greedy commits and never looks back, dynamic programming looks everywhere before committing.
+
+---
+
+## Exercises
+
+### Warm-up
+
+**1.** Apply the earliest-finish-time algorithm to this set of intervals: [1,4], [3,5], [0,6], [5,7], [3,8], [5,9], [6,10], [8,11], [8,12], [2,13], [12,14]. List the intervals selected in order, and state the total count. Then verify by checking that no two selected intervals overlap.
+*(Tests: mechanical application of the earliest-finish-time greedy.)*
+
+**2.** Build the Huffman tree for these four symbols and frequencies: A=50, B=25, C=15, D=10. Show the merge steps. Then write out the codeword for each symbol and calculate the average code length in bits (weighted by frequency). Compare it to the naïve 2-bit fixed-length encoding.
+*(Tests: Huffman construction and average-length calculation.)*
+
+**3.** You have the following weighted edges in a graph: (A–B, 4), (A–C, 2), (B–C, 1), (B–D, 5), (C–D, 8), (C–E, 10), (D–E, 2). Run Kruskal's algorithm. List the edges added in order and state the total MST weight.
+*(Tests: Kruskal's algorithm with cycle detection.)*
+
+---
+
+### Application
+
+**4.** The exchange argument for earliest-finish-time relies on the fact that *g₁* finishes no later than *o₁*. Explain precisely why this property ensures the replacement *O'* (with *o₁* swapped for *g₁*) has no new conflicts with the remaining meetings in *O*. Then explain why the same argument would *fail* if you tried to run it for earliest-start-time — what breaks at the step where you attempt the replacement?
+*(Tests: understanding the exchange argument as a logical structure, not just a result.)*
+
+**5.** You have six meetings to schedule across as few rooms as possible: [9,10], [9,11], [10,12], [11,13], [12,14], [13,15].
+
+   - (a) What is the schedule depth (maximum simultaneous meetings at any point)?
+   - (b) Run the earliest-start-time greedy to assign rooms. Show the assignment.
+   - (c) How many rooms does the greedy use? Is this optimal? Explain using the lower-bound argument.
+
+*(Tests: interval partitioning, depth as lower bound, greedy achieves the bound.)*
+
+**6.** For coin denominations {1, 5, 10, 25}, the greedy algorithm (take the largest coin that fits) is optimal. For denominations {1, 6, 10}, it is not.
+
+   - (a) Show that greedy fails on {1, 6, 10} for amount 12 by exhibiting the greedy solution and the optimal solution.
+   - (b) The greedy works for US denominations because each coin denomination "covers" the gap left by not using the next larger one efficiently. Explain informally why this structural property holds for {1, 5, 10, 25} but fails for {1, 6, 10}.
+   - (c) What algorithm solves coin change correctly for arbitrary denominations?
+
+*(Tests: recognizing where greedy fails, the matroid/non-matroid distinction in concrete terms.)*
+
+---
+
+### Synthesis
+
+**7.** Prim's algorithm and Dijkstra's algorithm (from Chapter 5) look nearly identical in structure: both maintain a priority queue, both repeatedly extract the cheapest element, both grow a tree from a starting vertex. Yet Prim's finds the minimum spanning tree and Dijkstra's finds shortest paths, and they are solving different problems.
+
+   Identify the precise difference in what each algorithm puts in the priority queue and what each "cheapest" means. Then explain why swapping the priority definitions — using Dijkstra's priority in Prim's setting, or vice versa — produces incorrect results.
+
+*(Tests: understanding both algorithms deeply enough to distinguish them, not just recall their steps.)*
+
+**8.** The vertex-cover greedy produces a 2-approximation. Construct a small graph (8 vertices or fewer) on which the greedy vertex cover is exactly twice the size of the optimal vertex cover. State the optimal cover and the greedy cover explicitly, and verify the factor of 2.
+
+*(Tests: approximation ratio analysis made concrete; understanding when the bound is tight.)*
+
+---
+
+### Challenge
+
+**9.** The chapter states: "a greedy algorithm solves the maximum-weight independent set problem optimally if and only if the structure is a matroid." The "if" direction (matroid → greedy is optimal) is the direction this chapter proves by exchange argument. The "only if" direction is the converse: if greedy is always optimal, the structure must be a matroid.
+
+   Explain what it would mean for the "only if" direction to fail — describe a hypothetical structure that is *not* a matroid but on which greedy is nevertheless always optimal. Then explain why matroid theorists believe no such structure exists (you do not need to reproduce the full proof — the argument by counterexample construction is sufficient).
+
+*(Tests: understanding the biconditional as a logical claim, not just memorizing the result; distinguishing the two proof directions.)*
+
+**10.** Design a greedy algorithm for the following problem and either prove it is optimal via an exchange argument, or construct a small counterexample showing it fails.
+
+   *Task scheduling with deadlines.* You have *n* unit-length tasks, each with a deadline (the latest time slot in which it can run) and a penalty (paid if the task misses its deadline). You want to minimize total penalty. You can run one task per time slot. Propose a greedy strategy, trace it on the instance: Task A (deadline 2, penalty 100), Task B (deadline 1, penalty 19), Task C (deadline 2, penalty 27), Task D (deadline 1, penalty 25), Task E (deadline 3, penalty 15). State whether your strategy is optimal and sketch why.
+
+*(Tests: applying the exchange-argument framework to a novel problem; distinguishing between "feels right" and "provably right.")*
 
 ---
 
