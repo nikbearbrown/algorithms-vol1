@@ -1,166 +1,278 @@
-# Data Structures
+# Chapter 3 — Data Structures
 
-## TL;DR
+*The question is never "does this work." The question is "what does this make cheap."*
 
-A data structure organizes data so the operations you need are cheap and the operations you don't need don't pay rent. Reach for this chapter when you are choosing between a hash map and a tree, designing storage for a workload with mixed access patterns, or asking why your `O(1)` structure feels slow at scale. After consulting it, you can match data structures to operation costs, recognize when a specialized structure is warranted, and avoid the default trap of reaching for the same map every time.
+---
 
-## When the choice of data structure matters
+Here is a puzzle I want you to sit with before we do anything else.
 
-You have a workload with named operations — insert, lookup, delete, range query, top-k, count-distinct, membership test — and a question about which structure makes those operations cheap together. Different structures optimize for different mixes. There is no universal winner.
+Suppose you have a billion web URLs — pages a crawler has already visited — and for every new URL the crawler discovers, you need to answer one question: *have we been here before?* That's it. Just yes or no. You need the answer fast, billions of times, and you cannot afford to store the full URL list in memory because you don't have that much memory.
 
-The signal: *you can list the operations and their relative frequencies*. If the workload is "lookup-heavy, occasional insert, no deletion," a hash table or a sorted array works. If the workload is "frequent insert and delete with bounded range queries," a balanced tree or a skip list earns its place. If the workload is "membership test only, billions of items, false positives acceptable," a bloom filter saves orders of magnitude in memory.
+A hash table answers the question in expected constant time. It also costs you memory proportional to the number of URLs stored, which at a billion entries starts to hurt.
 
-The second signal: *the data structure is the bottleneck*. A profiler shows hot spots in your map's lookup or your queue's pop. Asymptotic bounds say everything is fine. You suspect the structure is wrong for the access pattern. This chapter tells you what to swap in.
+A bloom filter answers the question in constant time with a fraction of the memory. Occasionally it says "yes, we've been here" when the honest answer is "no, actually." It never says "no" when the answer is "yes."
 
-The third signal: *you reached for a hash map by default and want to know whether that was right*. Often it was. Sometimes it was not. The misconception engaged in §9 is exactly this default.
+Which structure do you reach for?
 
-## What you need to know first
+If your instinct was "hash table, obviously," I want to examine that instinct. Not because it's wrong — for most problems, it's right. But because the moment you said "obviously," you stopped asking the question that actually matters: *what operations do I need, and what does each structure make cheap?*
 
-This chapter assumes Big O notation, amortized analysis, and basic recursion (Chapter 2). The dynamic-table case study in §3 is the canonical worked amortized analysis; if amortized analysis is rusty, re-read Chapter 2 §5 first. Implementations are not provided in full — for working code in your language, consult your standard library or the companion-page implementations.
+That question is what this chapter is about.
 
-## Arrays and dynamic arrays
+---
 
-A static array is contiguous memory: `O(1)` access by index, `O(n)` insert at arbitrary position. Dynamic arrays — Python's `list`, Java's `ArrayList`, C++'s `std::vector` — wrap a static array with automatic growth: when full, allocate a buffer twice the size, copy elements over.
+## The idea that holds everything else together
 
-The cost of growth is `O(n)` for any single resize. The cost across `n` appends is `O(n)` total — `O(1)` amortized per append. The proof: the geometric series `1 + 2 + 4 + ... + n/2 + n` sums to less than `2n`. The accounting method, the aggregate method, and the potential method (Chapter 2 §5) all give the same bound.
+<!-- → INFOGRAPHIC: radial "operation cost map" — each data structure as a node, labeled operations radiating from it, colored by O(1)/O(log n)/O(n); makes the "every structure optimizes for a mix" claim visually scannable at a glance -->
 
-Why this matters for choice: dynamic arrays beat linked lists for almost all production workloads. Both have `O(1)` append amortized. The array's contiguous memory wins on cache locality, prefetching, and constant-factor overhead per element. The linked list earns its place only when arbitrary-position insertion or deletion dominates the workload — and even then, a tree is often the better answer.
+A data structure is a deal. You give it data. It gives you fast access to some operations and slow access to others. Every structure optimizes for a particular mix of operations, and there is no structure that's fast at everything. If there were, we'd have one data structure and call it a day.
 
-## Heaps
+The art of choosing data structures is the art of reading a workload — listing the operations you actually need, their relative frequencies, and what "fast" has to mean — and then matching that profile to the structure whose cheap operations line up with yours.
 
-A heap is a complete binary tree (filled left-to-right at every level) where every parent dominates its children: `parent ≥ children` for a max-heap, `parent ≤ children` for a min-heap. The complete-tree shape lets you store the heap in an array with arithmetic on indices: parent of `i` is at `(i-1)/2`, children at `2i+1` and `2i+2`.
+This sounds obvious when stated. It fails constantly in practice, because we have defaults. The default is the hash map. The hash map is a fine default. It is not a universal default. I'll show you exactly where it breaks, and why.
 
-Operations: insert is `O(log n)` (push to end, sift up). Extract-min/max is `O(log n)` (swap root with last, shrink, sift down). Peek is `O(1)`. Heapify (build a heap from an unordered array) is `O(n)`, not `O(n log n)` — the analysis is a recurrence-tree argument, not a bound from `n` insertions.
+---
 
-**Binary heap** is the workhorse implementation. The dominant use is the priority queue. The dominant algorithmic uses are heap sort (Chapter 4) and Dijkstra's shortest-path algorithm (Chapter 5).
+## Arrays: the structure that wins on physics
 
-**Binomial heap** supports `O(log n)` merge of two heaps, useful when you need to combine independent priority queues.
+Start with arrays, because everything else is built in reaction to them.
 
-**Fibonacci heap** supports `O(1)` amortized decrease-key, which improves Dijkstra's algorithm's bound from `O((V+E) log V)` to `O(E + V log V)` and Prim's MST algorithm similarly. In practice, the constants are large; production implementations rarely use Fibonacci heaps. The bound matters in theory; the constants matter in production. [verify] best-case implementation comparisons on real graphs.
+A static array is a contiguous block of memory. You ask for element `i`, you get it in one operation: start address plus `i` times element size. The CPU doesn't deliberate. It reaches in and takes it. That's `O(1)` access by index, and the constant factor is as small as it gets.
 
-Use a heap when the operations are insert plus extract-min (or extract-max). Use a balanced search tree when you also need lookup by key, range queries, or in-order traversal.
+The catch: the array is fixed size. You allocated ten slots; you cannot have eleven without allocating a new block and copying everything over.
 
-## Balanced search trees
+Dynamic arrays — Python's `list`, Java's `ArrayList`, C++'s `std::vector` — solve this by doubling when full. You insert an eleventh element, the structure notices it's out of room, allocates a block of twenty, copies the ten elements over, and continues. That single insert cost `O(n)`. The next nine inserts cost `O(1)` each. Then you double again.
 
-A binary search tree maintains the invariant: for every node, all keys in the left subtree are smaller, all keys in the right subtree are larger. Lookup, insert, and delete are `O(h)` where `h` is the tree's height. The trouble is that adversarial insert order — sorted input, for instance — produces a tree of height `n`, degrading every operation to `O(n)`.
+The key insight — and this is worth pausing on — is that the expensive inserts happen rarely enough that they don't ruin the average. The total cost of `n` appends is `O(n)`, because each element gets copied at most once per doubling, and doublings are geometrically spaced. Spread that total cost across `n` operations and you get `O(1)` amortized per append.
 
-Self-balancing trees enforce `h = O(log n)`. Three common variants.
+Amortized doesn't mean each operation is fast. It means the expensive operations are rare enough that they don't change the average. When you need a hard real-time guarantee — every single operation must complete in bounded time — amortized analysis tells you nothing useful. When you care about throughput, it tells you everything.
 
-**Red-black trees** maintain balance with color invariants and rotations. Worst-case `O(log n)` for insert, delete, lookup. The C++ standard library's `std::map` and `std::set`, the Java standard library's `TreeMap` and `TreeSet`, and the Linux kernel's process scheduler use red-black trees. [verify] Linux kernel CFS internals if cited specifically.
+Now here is something worth understanding about why dynamic arrays dominate linked lists in almost every production setting. A linked list also supports `O(1)` append. It also supports `O(1)` insert at a known position. By the asymptotic analysis alone, they're tied.
 
-**AVL trees** maintain a tighter balance invariant — height difference between subtrees at most 1. Lookups are slightly faster than red-black trees in practice; inserts are slightly slower because rebalancing is more aggressive.
+They are not tied.
 
-**B-trees** generalize binary search trees to higher branching factors. A B-tree node holds many keys and many children, so the tree is shallow. The dominant use is on-disk storage — databases (PostgreSQL, MySQL InnoDB) and filesystems (ext4, NTFS) use B-trees and B+ trees because each tree-node fetch is a disk page, and shallow trees mean few page fetches per query. [verify] specific database internals.
+Dynamic array elements sit in contiguous memory. When you scan them, your CPU prefetches the next element while you're still processing the current one. Cache miss rate is low. Linked list elements are scattered across the heap, allocated wherever `malloc` found space. Traversing a linked list means following a pointer from one arbitrary memory location to another, which is almost guaranteed to be a cache miss. The constant factor swamps the theoretical tie.
 
-Use a balanced tree when the workload mixes insertion, deletion, lookup, and ordered-range queries. Range queries are the discriminator: hash tables cannot do them.
+<!-- → IMAGE: side-by-side memory layout diagram — top row shows dynamic array as a contiguous colored strip, bottom row shows linked list as boxes with pointer arrows leaping to random addresses; caption should note that the pointer jumps are the cache misses -->
 
-## Hash tables
+Linked lists earn their place at one workload: arbitrary-position insertion and deletion when you already have a pointer to the node you're modifying. Nowhere else does a linked list outperform an array in practice.
 
-A hash table maps keys to values via a hash function: keys hash to a bucket index, the bucket stores the value. Expected `O(1)` lookup, insert, and delete when the table is well-sized and the hash function is good.
+---
 
-Two common collision strategies. **Separate chaining** stores a linked list (or small array) at each bucket; collisions append to the list. **Open addressing** stores values directly in the bucket array; collisions probe to the next slot via linear probing, quadratic probing, or double hashing. Open addressing has better cache behavior; separate chaining handles high load factors more gracefully.
+## Heaps: the structure for "give me the best one"
 
-**Universal hashing** picks a hash function at random from a family of functions, defeating any specific adversarial input. The construction `h_{a,b}(k) = ((ak + b) mod p) mod m` for random `a` and `b` and prime `p > |key set|` is the canonical example.
+Suppose the only operations you need are: insert an item with a priority, and always give me the minimum-priority item.
 
-The expected `O(1)` bound assumes a uniform distribution of keys across buckets. Adversarial input — keys crafted to hit the same bucket — produces `O(n)` lookup. The algorithmic complexity attack on hash tables (Crosby and Wallach, 2003) [verify] is a real production concern: it took down web servers in the early 2000s. Modern languages defend against it by seeding hash functions with per-process random values; check your language's documentation.
+This comes up constantly. A task scheduler runs the highest-priority job next. Dijkstra's shortest-path algorithm always explores the closest unvisited node next. A hospital triage system always treats the most critical patient next.
 
-Hash tables do not support range queries. They do not iterate in any defined order (unless they're insertion-ordered, like Python `dict` since 3.7 [verify]). They pay a cache penalty for the bucket array if the table grows beyond L2 or L3. They pay a memory overhead for empty buckets at low load factors.
+The heap is built for exactly this.
 
-Use a hash table when lookups dominate, the keys do not need ordering, range queries are absent, and the input is either trusted or hash randomization is enabled.
+Picture a binary tree that's completely filled level by level, left to right. Every node satisfies one rule: it's smaller than both its children. So the smallest element is always at the root.
 
-## Bloom filters and probabilistic structures
+Insert: put the new element at the next open leaf position, then "sift it up" — swap it with its parent until the heap property is restored. This takes at most `O(log n)` steps, because the tree has height `log n`.
 
-When the workload is "membership test only" — does this URL appear in the visited set? has this user ID seen this ad? — and the set is large, a bloom filter trades a bounded false-positive rate for orders of magnitude less memory.
+Extract-min: take the root (which is the minimum), move the last leaf to the root, then "sift it down" — swap it with its smaller child until the heap property is restored. Also `O(log n)`.
 
-**Bloom filter.** A bit array of size `m` and `k` independent hash functions. To insert: hash the element with each of `k` functions, set those bits to 1. To test membership: hash with all `k` functions, if any of those bits is 0 the element is definitely absent; if all are 1 the element is *probably* present (could be a false positive). False negatives are impossible. False positive rate `p ≈ (1 − e^(−kn/m))^k` for `n` inserted elements, optimal at `k = (m/n) ln 2`.
+The clever part is that you can store this tree in an array. The root is at index 0. Its children are at indices 1 and 2. The children of index `i` are at `2i+1` and `2i+2`. You never need pointer arithmetic or dynamic allocation. The array layout also gives you the same cache benefits as a plain array.
 
-**Count-min sketch.** Estimates the count of each item in a stream. Two-dimensional array of `d` rows and `w` columns; `d` independent hash functions. Insert: for each row, hash and increment. Query: minimum over rows. Bounded overcount with high probability.
+<!-- → IMAGE: dual-panel diagram — left panel shows the heap as a labeled binary tree (nodes numbered 0–6), right panel shows the same heap as a flat array with index annotations and arrows connecting tree positions to array slots; student should see the arithmetic relationship at a glance -->
 
-**HyperLogLog.** Estimates the cardinality (count of distinct items) in a stream using a few KB of memory regardless of stream size. Used by Redis, BigQuery, Presto, and most analytics systems for `COUNT DISTINCT` queries on billions of items. [verify] specific system implementations.
+One counterintuitive result: if you have an unordered array and want to turn it into a heap, the naive approach — insert each element one at a time — costs `O(n log n)`. But there's a smarter approach: sift down from every internal node, starting at the bottom. This costs `O(n)`. The proof is a geometric series: most nodes are near the bottom, where sifting down costs almost nothing. The savings add up.
 
-These structures fail loudly: count-min sketch overestimates, bloom filter false-positives, HyperLogLog has bounded relative error. They are correct given that the user accepts the failure mode. Use them when memory is the constraint and bounded error is acceptable.
+This `O(n)` construction is what makes heap sort possible: heapify the array in `O(n)`, then repeatedly extract the minimum in `O(log n)` each, for a total of `O(n log n)`. Same asymptotic cost as merge sort, but fully in-place.
 
-## Union-Find
+A binary heap handles the standard priority-queue workload. When you also need to merge two independent priority queues, a binomial heap supports `O(log n)` merge. When you need to decrease the priority of an existing element — which Dijkstra's algorithm does — a Fibonacci heap supports `O(1)` amortized decrease-key. The theoretical improvement to Dijkstra's running time is real. The constants on a Fibonacci heap are large enough that in practice, a binary heap is usually competitive or better on actual hardware. Theory and implementation sometimes disagree; measure before you trust the bound.
 
-A disjoint-set data structure supporting two operations: `Find(x)` returns the representative of the set containing `x`; `Union(x, y)` merges the sets containing `x` and `y`. The dominant use is Kruskal's MST algorithm (Chapter 6) and connectivity queries in dynamic graphs.
+---
 
-The naive implementation gives `O(n)` per operation. Two optimizations together give nearly-constant amortized time:
+## Balanced search trees: the structure for ordering
 
-**Path compression** flattens the tree during `Find`: every node on the path from `x` to the root becomes a direct child of the root.
+A binary search tree maintains a simple invariant: every node's key is larger than all keys in its left subtree and smaller than all keys in its right subtree. Lookup, insert, and delete all follow the same path from root to leaf, taking `O(h)` time where `h` is the tree's height.
 
-**Union by rank** (or by size) merges the smaller tree into the larger one, keeping trees shallow.
+The problem: `h` depends on insert order. Feed a sorted sequence to a naive binary search tree and it degenerates into a linked list — every node hangs to the right, `h = n`, every operation costs `O(n)`. The elegant invariant fails to protect itself from adversarial input.
 
-With both, the amortized cost per operation is `O(α(n))`, where `α` is the inverse Ackermann function — effectively constant for any `n` you will encounter (it exceeds 4 only for `n` larger than the number of atoms in the observable universe). [verify] specific Tarjan 1975 paper attribution.
+Self-balancing trees add rebalancing operations — rotations and color flips — that enforce `h = O(log n)` no matter what order you insert. The result: guaranteed `O(log n)` for all three operations.
 
-Use union-find for connected-components queries on a dynamic graph. Use it for Kruskal's. Otherwise, a hash table mapping element to representative is simpler and competitive at small scale.
+Red-black trees are the dominant implementation. Each node is colored red or black; a set of color invariants implies the tree height stays within a factor of 2 of optimal. The C++ standard library's `std::map` and `std::set` are red-black trees. Java's `TreeMap` and `TreeSet` are red-black trees. The Linux kernel's process scheduler uses a red-black tree to track runnable processes. The structure has earned its place.
 
-## Decision rules
+<!-- → IMAGE: two-panel tree diagram — left panel shows a degenerate BST built from sorted input (a right-leaning chain of height n), right panel shows the same keys in a balanced red-black tree of height ~log n; caption should make the height difference the focus, not the coloring -->
+
+AVL trees maintain a tighter balance — height difference between any node's subtrees is at most 1. Lookups are marginally faster; inserts do more work to maintain the tighter invariant. The practical difference is small and workload-dependent.
+
+B-trees change the question entirely. Instead of binary branching (each node has at most 2 children), B-tree nodes hold many keys and many children. A B-tree node with `t` as the minimum degree holds between `t-1` and `2t-1` keys and between `t` and `2t` children. This makes the tree very shallow. Lookup, insert, and delete still cost `O(\log n)$, but `log` base `t` rather than base 2 — far fewer levels.
+
+Why does this matter? Because on disk, reading a node means fetching a page. You want as few page fetches as possible. A shallow tree means few levels means few page fetches. Databases and filesystems use B-trees and B+ trees for exactly this reason — PostgreSQL, MySQL's InnoDB storage engine, the ext4 and NTFS filesystems. These are not textbook exercises. They are the structures holding your data right now.
+
+The discriminator between hash tables and balanced trees is one capability the hash table lacks entirely: **range queries**. "Give me all keys between `a` and `b`" requires an ordered structure. A balanced tree answers this in `O(\log n + k)` where `k` is the number of results. A hash table cannot answer it at all without scanning every element.
+
+---
+
+## Hash tables: the structure for lookup
+
+A hash table maps a key to a value through a hash function. The hash function transforms the key into an index in an array (the bucket array). The value lives at that index. Lookup: hash the key, go to the index, retrieve the value. Expected `O(1)`.
+
+Two elements can hash to the same index — a collision. **Separate chaining** handles collisions by storing a linked list at each bucket; colliding elements join the list. **Open addressing** stores everything in the bucket array itself; collisions probe forward to the next open slot via some probe sequence.
+
+Open addressing has better cache behavior — all lookups stay within the contiguous bucket array. Separate chaining handles high load factors (fraction of buckets occupied) more gracefully; it doesn't degrade sharply as the table fills. Most practical implementations use open addressing with a load factor threshold — resize (double the array, rehash everything) when load factor exceeds roughly 0.7.
+
+The `O(1)` bound is *expected* under the assumption that keys hash uniformly across buckets. That assumption can fail. If an attacker knows your hash function, they can craft keys that all hash to the same bucket, driving every operation to `O(n)` — a realistic attack that took down web servers in the early 2000s. Modern language runtimes defend against this by seeding hash functions with a per-process random value; the attacker doesn't know the seed and can't craft the collision pattern. Check whether your environment provides this protection; configurations exist where it doesn't.
+
+**Universal hashing** is the principled defense: pick a hash function at random from a family where no adversarial input can force systematic collisions. The family $h_{a,b}(k) = ((ak + b) \bmod p) \bmod m$ for random $a$ and $b$ and a prime $p$ larger than the key universe is the canonical construction. Each key independently has a $1/m$ probability of landing in any bucket, regardless of what other keys are present.
+
+The hash table's limits: no range queries, no ordered iteration (unless the implementation explicitly maintains insertion order, as Python's `dict` has done since version 3.7), and a cache penalty when the bucket array grows beyond last-level cache. A table with ten million entries is unlikely to fit in L3; random-access lookups will miss cache and pay the full RAM latency penalty. At that scale, a sorted array with binary search — which has worse asymptotic cost but contiguous access — often wins on wall-clock time.
+
+---
+
+## Probabilistic structures: approximate is enough
+
+The bloom filter deserves its own discussion because it illustrates a principle that matters more as systems scale: sometimes you don't need an exact answer, and accepting a bounded approximation buys you an order-of-magnitude resource reduction.
+
+A bloom filter uses a bit array of size `m` and `k` independent hash functions. To insert an element: hash it `k` times, set those `k` bits to 1. To test membership: hash it `k` times, check those `k` bits. If any bit is 0, the element is definitely absent. If all bits are 1, the element is *probably* present — some earlier element might have set all those same bits by coincidence.
+
+False negatives are impossible. A false positive means the filter claims an element is present when it isn't. The false positive rate is:
+
+$$p \approx \left(1 - e^{-kn/m}\right)^k$$
+
+for `n` elements inserted. You can tune this. More bits per element, lower false positive rate. The optimal number of hash functions is $k = \frac{m}{n} \ln 2$. For 1% false positive rate, you need roughly 9.6 bits per element — orders of magnitude less than storing the elements themselves.
+
+<!-- → CHART: line chart with false positive rate (y-axis, log scale 0.001%–10%) vs. bits-per-element (x-axis, 4–20), one line per k value (k=1,2,3,5,7,10); student should see that the optimal k traces a curve and that going below ~8 bits per element makes 1% FPR impossible at any k -->
+
+The crawler problem from the opening of this chapter is exactly where a bloom filter belongs. You have a billion URLs. Each URL might be 50-100 bytes. Storing them in a hash set costs 50-100 GB. A bloom filter at 1% false positive rate costs roughly 1.2 GB. What does a 1% false positive rate cost you? The crawler re-visits 1% of URLs it should have skipped. Almost certainly acceptable.
+
+Two related structures worth knowing: **HyperLogLog** estimates the count of distinct items in a stream using kilobytes of memory regardless of stream size, with bounded relative error — used by Redis and most analytics platforms for `COUNT DISTINCT` queries on billions of items. **Count-min sketch** estimates the frequency of each item in a stream using a two-dimensional array of counters and `d` independent hash functions; the estimate is always an overcount, but bounded. Both structures accept bounded error in exchange for constant memory. Use them when memory is the constraint and the error bound is acceptable to your application.
+
+---
+
+## Union-Find: the structure for connectivity
+
+Suppose you have a set of items, and operations arrive that say "these two things are in the same group." After many such merges, you want to answer: "are these two things in the same group?" This is the connected-components problem.
+
+Union-Find (also called Disjoint Set Union) solves it. Each item belongs to a set, represented by a tree rooted at a representative element. `Find(x)` returns the representative of `x`'s set; `Union(x, y)` merges `x`'s set and `y`'s set.
+
+Naive implementation: every element points to its parent, root points to itself. `Find` climbs to the root. `Union` makes one root point to the other. Cost per operation: `O(n)` in the worst case if the tree becomes a chain.
+
+Two optimizations together bring this to nearly constant time.
+
+**Union by rank**: when merging two trees, attach the shorter tree's root under the taller tree's root. This keeps trees shallow.
+
+**Path compression**: when `Find` climbs from `x` to the root, make every node on that path a direct child of the root. Future `Find` calls on any of those nodes go directly to the root.
+
+<!-- → IMAGE: before/after diagram of path compression — left shows a chain of five nodes (deep tree), right shows the same nodes all pointing directly to root after one Find call; caption should note that the restructuring happens as a side effect of the lookup, not as a separate pass -->
+
+With both optimizations, the amortized cost per operation is $O(\alpha(n))$ where $\alpha$ is the inverse Ackermann function. $\alpha(n)$ grows so slowly that it never exceeds 4 for any `n` smaller than the number of atoms in the observable universe. For practical purposes, every operation is constant time.
+
+Kruskal's minimum spanning tree algorithm uses Union-Find to efficiently check whether adding an edge would create a cycle: if both endpoints are already in the same component, skip the edge. Dynamic graph connectivity queries — "are these two nodes currently connected, given that edges are being added?" — are a natural fit.
+
+---
+
+## The decision table
+
+State the operations you need. State the working-set size relative to cache. State whether range queries are required. The structure falls out.
+
+<!-- → TABLE: decision table as a formatted reference card — three columns: "Workload signature", "Recommended structure", "Key reason" (the one-phrase justification for the choice); the "Key reason" column is what's missing from the prose table and makes this a self-contained reference -->
 
 | Workload signature | Recommended structure |
-| --- | --- |
-| Index-by-position, append-heavy | Dynamic array |
-| Lookup-by-key only, no order | Hash table |
-| Lookup, insert, delete, ordered iteration, range queries | Balanced BST (red-black, AVL) |
-| On-disk storage, large pages | B-tree or B+ tree |
+|---|---|
+| Index by position, append-heavy | Dynamic array |
+| Lookup by key, no ordering, no range queries | Hash table |
+| Lookup, insert, delete, ordered iteration, range queries | Balanced BST |
+| On-disk storage, page-level access | B-tree / B+ tree |
 | Insert + extract-min only | Binary heap |
-| Insert + decrease-key + extract-min, large graph | Fibonacci heap (theory) or binary heap (practice) |
-| Membership test, large set, false positives OK | Bloom filter |
+| Membership test, large set, false positives acceptable | Bloom filter |
 | Count distinct over a stream | HyperLogLog |
 | Frequency estimate over a stream | Count-min sketch |
-| Connected components in a dynamic graph | Union-Find with path compression and union-by-rank |
+| Connected components, dynamic graph | Union-Find with path compression + union by rank |
 
-## Worked example — real-time analytics storage
+The hash map is not on every row. This is intentional.
 
-A real-time analytics service ingests events at 100,000 per second [verify]. Each event has a timestamp, a user ID, an event type, and a payload. Three queries dominate the workload:
+---
 
-1. **Top-k event types in the last 5 minutes.**
-2. **Count of distinct users who saw event type X in the last hour.**
-3. **All events of type X with timestamp in `[t1, t2]`.**
+## The default trap
 
-A naive design uses a single hash map from event type to a list of events. Top-k requires a full scan. Count-distinct requires deduplicating user IDs, which costs memory proportional to the number of distinct users. Range queries on timestamp are linear scans. At 100K events per second, none of this scales.
+The misconception this chapter engages is specific: *a hash map's `O(1)` lookup makes it the right default for any keyed access.*
 
-The right design uses three structures, each tuned to one query.
+Three places this breaks.
 
-**Top-k.** A min-heap of size `k` keyed on event-type counts, refreshed by a sliding window. Each event increments a counter for its event type; if the count exceeds the heap's minimum, the heap is updated. Cost per event: `O(log k)`. The window slides by expiring counts older than 5 minutes, which can be implemented with a circular buffer of one-minute windows. The heap holds the top-k summary; the sliding window holds the per-minute breakdown.
+**Range queries.** A hash map cannot answer "all keys between `a` and `b`" in sub-linear time. The keys have no order. If you need range queries — timestamps, numeric IDs, lexical prefixes — you need a tree. Using a hash map forces a full scan every time.
 
-**Count-distinct.** A HyperLogLog sketch per event type, refreshed every minute. The sketch costs about 12 KB per event type for ≤2% relative error on cardinalities up to billions [verify]. Compare to a hash set, which would cost `O(d)` memory in the count of distinct users — gigabytes for a large workload. The sketch trades a small bounded error for orders of magnitude less memory and constant-time updates.
+**Cache pressure at scale.** At ten million entries, a hash map's bucket array is unlikely to fit in L3. Random-access lookups miss cache, fetch from RAM, pay 100× the latency of a cache hit. A sorted array over the same data, accessed by binary search, has asymptotically worse lookup — `O(\log n)` versus `O(1)` — but each access lands in contiguous memory, prefetches well, and often wins on actual wall-clock time. Asymptotic bounds describe behavior as `n` grows. Hardware is fixed. When the structure is sized larger than your last-level cache and access is random, measure both before deciding.
 
-**Range queries.** A B+ tree keyed on `(event_type, timestamp)`. Range queries on timestamp within a single event type become a leaf-level scan of contiguous nodes. Cost per query: `O(log n + k)` where `k` is the result size. This is what databases do; we are not reinventing the wheel, we are reaching for the structure databases reach for.
+**Adversarial input.** In any setting where user-supplied data keys the hash table, the `O(1)` expected bound depends on the attacker not knowing your hash function. If they do, they construct inputs that all hash to one bucket, every operation becomes `O(n)`, and you have a denial-of-service vulnerability. Keyed hash functions and universal hashing are the defense.
 
-The naive single-hash-map design failed because it tried to support three different access patterns with one data structure. The right design uses three structures because the workload has three operation profiles. None of the structures is exotic; the discrimination is matching structure to operation, not inventing structures.
+**Memory overhead at low load factor.** A hash table at 50% load factor uses memory for twice as many slots as elements. A balanced tree uses memory for exactly the nodes it holds, plus pointer overhead. Neither is universally cheaper; the comparison depends on element size and load factor. The hash table's memory cost is not zero.
 
-## Failure modes — the "use a hash map by default" trap
+The corrective is to ask the question before reaching for the default: what operations do I actually need, and what does each structure make cheap? The hash map answers that question correctly most of the time. The habit of asking is what prevents the cases where it doesn't.
 
-The misconception: a hash map's `O(1)` lookup makes it the right default for any keyed access.
+---
 
-Three concrete failure modes.
+## What you can do now that you couldn't before
 
-**Range queries.** Hash maps cannot answer "all keys between `a` and `b`" in any sub-linear way. The keys are not stored in any order. If your access pattern includes range queries — timestamps, IDs, lexical prefixes — you need a tree or a sorted structure. The hash map's bound is great for the operations it supports; it does not support yours.
+You can read a workload description — its operations, their frequencies, its scale relative to cache — and name the structure or combination of structures that makes those operations cheap. You can explain why the hash map is a fine default and precisely where it fails. You can describe the trade-off a bloom filter makes and the workloads where that trade-off is correct. You can implement union-find with both optimizations and explain why the amortized cost is effectively constant.
 
-**Cache pressure at scale.** A hash map with ten million entries does not fit in L2 cache on most hardware. Random-access lookup misses cache, fetches from RAM, pays the 100× latency hit. A sorted array of the same data, accessed by binary search, has worse asymptotic cost (`O(log n)` vs `O(1)`) but often wins on wall-clock time because each access is in a contiguous block that prefetches well. Asymptotic bounds describe the field, not the conclusion. The corrective heuristic: when the structure is sized larger than your last-level cache and access is random, measure both.
+The next chapter applies several of these structures in the context of sorting: the heap earns its place in heap sort, comparison-based lower bounds explain why certain structures can't be sorted in sub-linear time, and the relationship between a sorted array and a balanced tree becomes concrete.
 
-**Adversarial input.** A public web service that hashes user-supplied strings is vulnerable to collision attacks unless the hash function is keyed by a per-process random secret. The `O(1)` bound is *expected* over a uniform input distribution; an attacker who controls the input distribution can drive every operation to `O(n)`. Modern languages default to keyed hashes, but configurations exist (custom hash functions, low-level library use) where this protection is absent.
+---
 
-**Memory overhead at low load factor.** A hash map with one million entries and a 50% load factor uses memory for two million bucket slots. A balanced tree with the same one million entries uses memory for one million nodes plus pointer overhead. The tree is often more memory-efficient at moderate scale. If memory is the constraint, the default isn't free.
+## Exercises
 
-The corrective: state the operations you need (lookup, ordered iteration, range query, membership test, decrease-key, merge), state the working-set size relative to cache, state whether the input is adversarial. The data structure choice falls out. The hash map is a fine default; it is not a universal default.
+### Warm-up
 
-## Cross-references
+**1.** A dynamic array currently holds 8 elements in a capacity-8 backing array. You append 3 more elements, one at a time, using geometric (×2) doubling. Trace each append: for each one, state whether a resize occurs, the capacity before and after, and the cost of that single append. Then state the total number of element-copy operations across all three appends.
+*(Tests: amortized analysis of dynamic array resizing.)*
 
-For amortized analysis worked through dynamic tables, see Chapter 2 §5. For heap sort and the heap-as-priority-queue use, see Chapter 4. For Dijkstra and Prim using heaps, see Chapter 5. For Kruskal using union-find, see Chapter 6. For randomized analysis of hashing and the algorithmic complexity attack, see Chapter 12. For LSH and other randomized data structures, see Chapter 12.
+**2.** Draw the min-heap that results from inserting the keys 9, 3, 7, 1, 5 into an initially empty heap, in that order. Show the heap after each insertion. Then perform one `extract-min` and show the resulting heap.
+*(Tests: heap insert and sift-up, extract-min and sift-down.)*
 
-## Companion-page handoffs
+**3.** A hash table uses open addressing with linear probing and a load factor threshold of 0.7. The table currently has capacity 10 and holds 6 elements. You insert 2 more elements. Does a resize trigger? If so, what is the new capacity? State your reasoning.
+*(Tests: load factor mechanics and resize threshold.)*
 
-Implementation comparisons across Python, Java, and C++ standard libraries; specialized structures deep-dives — bloom filter sizing calculator, count-min sketch implementations, skip lists, treaps, persistent data structures; benchmark harnesses comparing tree variants and hash-table strategies on representative workloads. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-3.
+---
 
-## What this chapter does not enable
+### Application
 
-This chapter does not give you implementation-ready code for every structure. Standard libraries do that, and reimplementing a red-black tree by hand is rarely the right call in production. The chapter also does not cover persistent data structures (immutable structures with cheap "modified" copies), succinct data structures (information-theoretically near-minimal storage), or the engineering tricks that distinguish a textbook hash table from `absl::flat_hash_map`. Those live on the companion page or in specialized references.
+**4.** For each workload below, name the data structure you would reach for first and give one sentence explaining the decisive operation that rules out the hash map:
 
-## Capability statement
+   - (a) A log-aggregation service that needs to answer "how many distinct IP addresses have we seen in the last hour?" over a stream of 500 million log entries per hour, with 2% relative error acceptable.
+   - (b) A flight-booking system that must efficiently retrieve all flights departing between 8:00 AM and 11:00 AM on a given date.
+   - (c) A spell-checker that needs to answer "is this word in the dictionary?" for a dictionary of 200,000 words, with a 0.1% false-positive rate acceptable and minimal memory use required.
 
-You can now match data structures to operation profiles, predict where the structure will be the bottleneck, recognize when a specialized structure is warranted, and avoid the default trap of reaching for the same map every time. The next time a workload arrives with a mix of access patterns, you can name the structure for each pattern, justify the choice from operation costs, and explain to a reviewer why the default would have failed.
+*(Tests: workload-to-structure matching for HyperLogLog, balanced BST range queries, and bloom filter.)*
 
+**5.** You are implementing Kruskal's minimum spanning tree algorithm on a graph with 10,000 nodes and 50,000 edges. The edges are sorted by weight. You process them in order, adding each edge to the spanning tree if its two endpoints are in different components.
+
+   - (a) Which data structure do you use to track connected components?
+   - (b) What are the two optimizations required for near-constant amortized cost, and what failure does each one prevent?
+   - (c) Without those optimizations, what is the worst-case cost of processing all 50,000 edges?
+
+*(Tests: Union-Find application and the necessity of both optimizations.)*
+
+**6.** A hash table with separate chaining holds `n` elements across `m` buckets, with load factor $\alpha = n/m$. An adversary knows your hash function and has crafted `n` keys that all map to bucket 0. What is the cost of a single lookup in this table? What defense does universal hashing provide, and why can the adversary not reproduce the attack after you deploy it?
+*(Tests: hash table collision analysis and the universal hashing defense.)*
+
+---
+
+### Synthesis
+
+**7.** A real-time leaderboard for an online game must support three operations: (1) update a player's score, (2) retrieve the top-10 players at any time, (3) retrieve a player's current rank (their position in the sorted order). A classmate proposes using a single max-heap. Identify the operation this design handles well and the two operations where it fails or becomes expensive. Then propose a structure or combination of structures that handles all three efficiently, and justify each choice.
+*(Tests: recognizing heap limitations; multi-structure design reasoning.)*
+
+**8.** You are designing storage for a URL shortener service (think `bit.ly`). The service has two access patterns: (A) given a short code like `xK3p`, retrieve the full URL — happens 100,000 times per second; (B) given a full URL, check whether we have already shortened it — happens 500 times per second, and it is acceptable to occasionally shorten the same URL twice. The full URL corpus is 2 billion entries.
+
+   Choose a data structure for each access pattern. For pattern (A), justify why a hash table is correct. For pattern (B), justify why a bloom filter is correct and calculate the approximate memory cost at a 1% false positive rate (assume average URL length of 80 bytes, and that the bloom filter requires ~9.6 bits per element).
+
+*(Tests: applying the hash table vs. bloom filter trade-off in a concrete system design scenario.)*
+
+---
+
+### Challenge
+
+**9.** The inverse Ackermann function $\alpha(n)$ is described in this chapter as "effectively constant for any `n` you will encounter." Explain what this claim means precisely — and what it does *not* mean. Specifically: is the amortized cost of Union-Find operations `O(1)`? If not, why do we say it is "effectively" constant? What would it mean for $\alpha(n)$ to exceed 5 for an input you could actually construct?
+*(Tests: precise understanding of asymptotic claims vs. practical guarantees; distinguishes "effectively constant" from "actually constant.")*
+
+**10.** Design a data structure for the following workload: a stream of (user\_id, event\_type) pairs arrives at 1 million events per second. At any moment, you must be able to answer: (a) approximately how many distinct users have triggered event type X in the last 5 minutes? and (b) which event type has the highest estimated count in the last 5 minutes? Memory is constrained to 10 MB total. Exact answers are not required; bounded error is acceptable.
+
+   Describe the structures you would use for each query, how you would handle the sliding 5-minute window, and what error guarantees your design provides.
+
+*(Tests: combining probabilistic structures — HyperLogLog for count-distinct, count-min sketch or similar for frequency — with sliding window mechanics; open-ended design with no single correct answer.)*
 
 ---
 
