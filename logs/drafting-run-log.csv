@@ -1,0 +1,14 @@
+chapter_number,chapter_slug,word_count,source_folders_used,verify_count,drafted_at,notes
+01,introduction,1704,Introduction_to_Algorithms (empty) + book.md + outline.md,1,2026-04-30,empty source folder; composed from book.md and outline.md
+02,algorithm-analysis,2906,Algorithm_Analysis,6,2026-04-30,§6 cache effects original to chapter; sorting/graph/greedy/D&C/DP/approx/randomized routed out
+03,data-structures,2862,Data_Structures + Algorithm_Analysis (hash routing),9,2026-04-30,HyperLogLog/Count-Min added beyond source for streaming-structures section
+04,sorting-and-caching,2526,Sorting_and_Caching + Algorithm_Analysis (sorting routing),12,2026-04-30,Timsort/Introsort/Dual-Pivot details added; specific dates and thresholds need verify
+05,graphs,2490,Graphs_and_Graph_Search_Algorithms + Algorithm_Analysis (graph routing),9,2026-04-30,Karger/min-cut routed to Ch 12; network flow routed to Ch 9
+06,greedy,2769,Greedy_Algorithms + Algorithm_Analysis (greedy routing),4,2026-04-30,vertex/set cover introduced briefly; full ratio analysis to Ch 11
+07,divide-and-conquer,2336,Divide_and_Conquer_Strategies + Algorithm_Analysis (D&C routing),7,2026-04-30,closest pair worked example; FFT briefly mentioned
+08,dynamic-programming,2572,Dynamic_Programming + Algorithm_Analysis (DP routing),10,2026-04-30,edit distance with production applications; Hirschberg space optimization
+09,network-flow,2520,Network_Flow,11,2026-04-30,image segmentation reduction; Boykov-Kolmogorov references
+10,np-completeness,2878,Intractability (thin) + canonical knowledge,14,2026-04-30,HIGHEST [verify] count; source folder near-empty; chapter composed from canonical NP-completeness knowledge
+11,approximation,2989,Approximation_Algorithms + Algorithm_Analysis (approx routing),12,2026-04-30,set cover sensor placement worked example; vertex/set cover full ratio analysis
+12,randomized,2680,Randomized_Algorithms + Algorithm_Analysis (randomized routing) + Graph_Algorithms (Karger),9,2026-04-30,Karger min-cut worked example; cryptographic vs algorithmic randomness
+13,linear-programming,3061,Linear_Programming,9,2026-04-30,refinery production planning; capstone — closes threads from Ch 6 9 11
