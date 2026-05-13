@@ -1,141 +1,263 @@
-# Graphs and Graph Search Algorithms
+# Chapter 5 — Graphs and Graph Search Algorithms
 
-## TL;DR
+*What it means to ask "can I get there from here?"*
 
-Graphs model relationships — vertices connected by edges with optional weights and direction. Reach for this chapter when a problem can be drawn as nodes and connections: maps, networks, dependencies, social structures, anything where "what connects to what" is the question. After consulting it, you can pick the right traversal (BFS, DFS), the right shortest-path algorithm (Dijkstra, Bellman-Ford, Floyd-Warshall, A\*), and recognize when a problem you have not yet drawn as a graph is in fact a graph problem.
+---
 
-## Recognition pattern
+Here is a question that sounds like it belongs to geography but doesn't: you have a collection of things, and some pairs of those things are connected. Can you get from this thing to that thing? What's the cheapest way? Is everything reachable from everywhere else?
 
-You have entities that connect to each other and a question whose answer involves those connections. The entities can be cities, computers, courses, web pages, friends, atoms, build tasks, or rooms in a maze. The connections can be roads, network links, prerequisites, hyperlinks, friendships, bonds, dependencies, or doors. If the question is about reachability ("can I get from A to B?"), shortest path ("what's the cheapest route?"), connectivity ("is everything connected?"), structure ("is there a cycle?"), or scheduling ("in what order must these tasks run?"), the problem is a graph problem.
+The things can be cities, computers, courses, web pages, people, atoms, build tasks, or rooms in a maze. The connections can be roads, cables, prerequisites, hyperlinks, friendships, chemical bonds, dependencies, or doors. The question is always the same: what does the structure of the connections tell you?
 
-The signal is *relationship as first-class*. If the data is a list and the operations are "for each item," it is not yet a graph. If the data has both items *and* a notion of which items relate to which, draw the graph. The drawing often makes the right algorithm obvious.
+That structure has a name. It's called a graph — not in the sense of a chart or a plot, but in the mathematical sense: a set of vertices connected by edges. And the reason graphs matter is not that they're a clever abstraction but that an enormous class of real problems, problems that look completely different on the surface, have exactly the same underlying structure. Once you see that structure, the algorithm follows almost inevitably.
 
-The second signal is *the problem looks like a problem you've seen on graphs before*. Bipartite matching, network flow, MST, topological sort, single-source shortest path — these are catalog problems. The art is recognizing your specific problem as one of them. The chapter's worked example walks through a road-network case where three different shortest-path algorithms apply for three different reasons.
+<!-- → [IMAGE: side-by-side panel showing four visually distinct domains — a road map, a social network, a software dependency diagram, a course prerequisite chart — with an arrow pointing to a single abstract graph drawing; student should see the recognition moment: four superficially different problems sharing identical underlying structure] -->
 
-A signal that this chapter is *not* the right one: the graph is small enough that brute force works. If you have a thousand nodes and need a single shortest path, write the cleanest implementation you can and ship it. The classical algorithms earn their place at scale.
+---
 
-## What you need to know first
+## What a Graph Actually Is
 
-This chapter assumes Big O (Chapter 2), heaps for Dijkstra's priority queue (Chapter 3 §4), and basic recursion (Chapter 7). For the DP framing of Bellman-Ford and Floyd-Warshall, see Chapter 8. For network-flow algorithms, which are graph algorithms but earn their own chapter, see Chapter 9.
+A graph is vertices and edges. Vertices are the things; edges are the connections between them. That's the entire definition.
 
-## Representations
+Edges can be *directed* — the connection goes one way. A web page can link to another page without being linked back. A course can be a prerequisite for another without the reverse being true. Directed graphs are sometimes called digraphs.
 
-Two ways to store a graph.
+Edges can be *weighted* — the connection has a cost or capacity. A road has a travel time. A network link has a bandwidth. A financial transaction has a fee. When weights are present, the question shifts from "can I get there" to "what's the cheapest way to get there."
 
-**Adjacency list.** For each vertex, store a list of its neighbors (and edge weights, if any). Memory: `O(V + E)`. Iteration over a vertex's neighbors: `O(deg(v))`. Edge existence query: `O(deg(v))`. The default representation for sparse graphs.
+Edges can be both directed and weighted, or neither. The algorithm you use depends on what you have.
 
-**Adjacency matrix.** A `V × V` matrix where entry `[i][j]` is the weight of the edge from `i` to `j`, or 0/∞ if no edge. Memory: `O(V²)`. Edge existence query: `O(1)`. Iteration over neighbors: `O(V)`. The default for dense graphs and for algorithms like Floyd-Warshall that operate on the matrix directly.
+Two ways to represent a graph in memory, and the choice matters for performance.
 
-Real-world graphs are almost always sparse — `E = O(V)` or `O(V log V)` rather than `O(V²)` — so the adjacency list is the dominant representation. The exception is when the graph is small (V < a few hundred) or when matrix operations are the algorithm.
+The **adjacency list** stores, for each vertex, a list of its neighbors (and edge weights, if any). Memory is proportional to the number of vertices plus the number of edges — `O(V + E)`. Iterating over a vertex's neighbors takes time proportional to how many neighbors it has. This is the right representation when the graph is *sparse* — when most vertices connect to relatively few others. Real-world graphs are almost always sparse: a road network has millions of intersections but each intersection connects to only a handful of roads.
 
-A third representation, **edge list**, stores the graph as a flat list of `(u, v, w)` triples. Useful for Bellman-Ford and Kruskal's MST, both of which iterate over edges rather than vertices.
+The **adjacency matrix** stores a `V × V` grid where entry `[i][j]` holds the weight of the edge from vertex `i` to vertex `j`, or infinity if no edge exists. Memory is proportional to the square of the number of vertices — `O(V²)`. Checking whether an edge exists between two specific vertices is instant, `O(1)`. But iterating over all neighbors of a vertex takes `O(V)` time regardless of how many neighbors it actually has. This is the right representation when the graph is *dense* — when most pairs of vertices are connected — or when the algorithm needs direct matrix access. Floyd-Warshall, which we'll reach, is built around matrix operations and naturally uses this form.
 
-## Traversal — BFS and DFS
+A third representation, the **edge list**, stores the graph as a flat list of triples: source vertex, destination vertex, weight. It's less convenient for traversal but natural for algorithms that iterate over edges rather than vertices. Bellman-Ford and Kruskal's MST algorithm work this way.
 
-Two foundational traversals; almost every other graph algorithm builds on one of them.
+<!-- → [TABLE: three-way comparison of adjacency list, adjacency matrix, and edge list — columns: representation, memory, edge existence query, neighbor iteration, best used when; student should be able to pick the right representation given a problem's graph density and the algorithm's access pattern] -->
 
-**Breadth-First Search (BFS).** Explore vertices in order of distance from the source: source, then all vertices at distance 1, then all at distance 2, and so on. Implementation: a FIFO queue. Time: `O(V + E)`. The natural fit for *shortest path in unweighted graphs* — the first time BFS reaches a vertex, the path is shortest. Also the natural fit for *minimum-hops* problems on unweighted graphs (number of friendship hops between two people, fewest button presses to reach a state).
+---
 
-**Depth-First Search (DFS).** Explore as deep as possible from the source before backtracking. Implementation: a stack (or recursion). Time: `O(V + E)`. The natural fit for *cycle detection*, *topological sort*, *strongly connected components* (Tarjan's, Kosaraju's), and any problem with a tree-like decomposition.
+## The Two Fundamental Traversals
 
-The choice between them is rarely a tradeoff between performance — both are linear — but between *what you want to know*. If you want shortest paths in an unweighted graph, BFS. If you want structural properties (cycles, components, ordering), DFS.
+Before you can do anything sophisticated with a graph, you need to be able to walk it — to visit every reachable vertex starting from some source. Two approaches, both taking `O(V + E)` time, differing only in the order they visit things.
 
-## Shortest paths
+**Breadth-first search** (BFS) explores vertices in order of their distance from the source. It visits the source first, then all vertices one edge away, then all vertices two edges away, and so on. The implementation uses a queue: put the source in, then repeatedly pull from the front, add unvisited neighbors to the back. The queue enforces the level-by-level order.
 
-Four canonical algorithms. Each fits a different problem shape.
+Why does this matter? Because BFS, on an unweighted graph, is a shortest-path algorithm. The first time BFS reaches any vertex, the path it followed is one of the shortest paths to that vertex — shortest in the sense of fewest edges. If you want to know the minimum number of hops between two things (minimum friendship distance in a social network, fewest keystrokes to reach a state, minimum road segments between two intersections), BFS gives you the answer directly.
 
-**Dijkstra's algorithm.** Single-source shortest paths in a graph with non-negative edge weights. Developed by Edsger Dijkstra in 1956 [verify]. Maintain a priority queue of vertices keyed on tentative distance from source; repeatedly extract the closest unfinalized vertex and relax its outgoing edges. Time: `O((V + E) log V)` with a binary heap, `O(E + V log V)` with a Fibonacci heap. The Fibonacci heap improves the asymptotic bound but rarely wins in practice; the binary heap is the production choice (Chapter 3 §4).
+**Depth-first search** (DFS) explores as deep as possible before backtracking. Starting from the source, it follows one path all the way until it hits a dead end or a vertex already visited, then backs up and tries another direction. The implementation uses a stack — or equivalently, recursion, which uses the call stack implicitly.
 
-The non-negativity constraint matters. With negative edges, Dijkstra can finalize a distance before discovering a shorter path through a negative edge. The algorithm is *correct* only when all weights are non-negative.
+The natural use for DFS is not path-finding but *structure detection*. When DFS finishes exploring from a vertex, it knows something about the structure around that vertex: whether there's a cycle (if it ever reaches a vertex already on the current path), what order to process tasks (topological sort, for directed acyclic graphs), which parts of the graph form strongly connected components. These are questions about the shape of the graph, not the cost of a path, and DFS is designed to answer them.
 
-**Bellman-Ford algorithm.** Single-source shortest paths in a graph that may contain negative edges. Developed by Richard Bellman and Lester Ford Jr. in the 1950s [verify]. Iterate `|V|−1` times, relaxing every edge each iteration. Time: `O(VE)`. After `|V|−1` iterations, all shortest paths are correct *unless* a negative cycle exists; one more pass that further relaxes any edge proves the negative cycle. Bellman-Ford is the right call when negative weights are part of the model — currency arbitrage detection, certain network protocols, or weights that encode "rebates" alongside costs.
+The choice between BFS and DFS is rarely about performance — both are linear in the size of the graph. It's about what you want to know. Minimum hops, BFS. Structure and ordering, DFS.
 
-**Floyd-Warshall algorithm.** All-pairs shortest paths via dynamic programming. Roy 1959, Floyd 1962, Warshall 1962 [verify]. Initialize a distance matrix from edge weights; for each intermediate vertex `k`, update every pair `(i, j)` with `min(d[i][j], d[i][k] + d[k][j])`. Time: `O(V³)`. Space: `O(V²)`. Wins on dense graphs where you want every pair's distance and `V` is small enough (a few hundred to a few thousand). The DP framing is in Chapter 8.
+<!-- → [IMAGE: the same small graph (8–10 vertices) traversed twice side by side — left panel shows BFS visit order with vertices numbered by discovery, concentric rings radiating from source; right panel shows DFS visit order with vertices numbered, a deep spine extending before backtracking; student should see viscerally why BFS discovers shortest paths and DFS reveals structure] -->
 
-**Johnson's algorithm.** All-pairs shortest paths in sparse graphs with possibly-negative edges. Donald Johnson, 1977 [verify]. Add a dummy vertex connected to every vertex with zero-weight edges; run Bellman-Ford from the dummy to compute vertex potentials; reweight edges to be non-negative; run Dijkstra from each vertex. Time: `O(VE log V)`. Beats Floyd-Warshall on sparse graphs.
+---
 
-**A\* (A-star).** Dijkstra with a heuristic. Maintain a priority queue keyed on `g(v) + h(v)`, where `g(v)` is the actual distance from source and `h(v)` is an admissible lower-bound estimate of the distance from `v` to the goal. When `h` is admissible (never overestimates) and consistent, A\* finds the optimal path. With a good heuristic, A\* explores far fewer vertices than Dijkstra. The classic heuristic for road networks is great-circle distance: a straight-line lower bound on travel time that aligns the search toward the goal.
+## Shortest Paths: Four Algorithms, Four Situations
 
-## Minimum spanning trees
+The interesting algorithms on graphs are the ones that find shortest paths when edges have weights. There are four classical approaches, each correct under a different set of constraints. Using the wrong one is not just inefficient — on negative-weight edges, Dijkstra is not merely slow, it is *wrong*.
 
-A minimum spanning tree (MST) of a connected weighted graph is a subset of edges that connects all vertices with minimum total weight. Three classical algorithms.
+**Dijkstra's algorithm** solves single-source shortest paths when all edge weights are non-negative. You want the shortest path from one source vertex to all others (or to a specific target). The idea: maintain a priority queue of vertices keyed on their tentative distance from the source. Repeatedly extract the vertex with the smallest tentative distance, finalize that distance, and update ("relax") the distances of its neighbors if you've found a shorter route through it. With a binary heap, the total time is `O((V + E) log V)`.
 
-**Kruskal's algorithm.** Sort edges by weight; iterate, adding each edge unless it creates a cycle (use Union-Find, Chapter 3 §6, to detect cycles efficiently). Time: `O(E log E)`. Wins on sparse graphs.
+The non-negativity requirement is not a technicality. Here is why it matters. When Dijkstra extracts a vertex from the priority queue, it declares that vertex's distance final — the claim is that no shorter path will be discovered later. This claim holds when all edges are non-negative: you can never find a shorter path to an already-finalized vertex because any extension through positive-weight edges can only increase the cost. With a negative edge, that claim breaks. You could extract a vertex, declare its distance final, and then discover a path through a negative edge that would have been cheaper. Dijkstra has no mechanism to revisit finalized vertices.
 
-**Prim's algorithm.** Grow the tree from a starting vertex; at each step, add the cheapest edge connecting a tree vertex to a non-tree vertex (use a priority queue, Chapter 3 §4). Time: `O(E log V)` with a binary heap. Wins on dense graphs.
+<!-- → [IMAGE: small directed graph (4–5 vertices) where Dijkstra produces an incorrect answer — show the graph with one negative edge, annotate which vertex Dijkstra finalizes first and its recorded distance, then show the actual shorter path through the negative edge that Dijkstra missed; student should see the failure mode concretely, not just as a stated constraint] -->
 
-**Borůvka's algorithm.** In each phase, every component finds its cheapest outgoing edge and merges. Time: `O(E log V)`. The oldest of the three (Borůvka, 1926) [verify]; useful in parallel implementations because the per-component work is independent.
+**Bellman-Ford** handles single-source shortest paths when edges can be negative. The approach is fundamentally different: instead of greedily extracting the closest vertex, simply iterate over every edge in the graph `|V| − 1` times, relaxing each edge each time. After `|V| − 1` iterations, if no negative cycle exists, all shortest distances are correct. One more pass that relaxes any edge further proves a negative cycle exists.
 
-The MST is the canonical greedy-on-matroid problem (Chapter 6); the proof of correctness is the cut-property exchange argument.
+Why `|V| − 1` iterations? The shortest path between any two vertices in a graph with no negative cycles visits at most `|V| − 1` edges (any more would imply a repeated vertex, i.e., a cycle, which could be removed to get a shorter or equal-length path). So `|V| − 1` passes are sufficient to propagate distance information along any possible shortest path.
 
-## Decision rules
+The cost of this generality is time: `O(VE)`, slower than Dijkstra by a factor of roughly `V / log V`. You reach for Bellman-Ford when the model demands it — negative-weight edges appear naturally in financial models (rebates, currency exchange rates where arbitrage opportunities create effective negative costs), certain network protocols, and optimization problems where costs can be negative.
 
-| You want | Use | Time |
-| --- | --- | --- |
-| Reachability or shortest unweighted path | BFS | `O(V + E)` |
-| Cycle detection, topological sort, SCC | DFS | `O(V + E)` |
-| Single-source shortest path, non-negative weights | Dijkstra | `O((V+E) log V)` |
-| Single-source with possibly-negative weights | Bellman-Ford | `O(VE)` |
-| Single-source with a goal node and a heuristic | A\* | depends on heuristic |
-| All-pairs, dense graph, small V | Floyd-Warshall | `O(V³)` |
-| All-pairs, sparse graph, possibly-negative weights | Johnson's | `O(VE log V)` |
-| MST, sparse graph | Kruskal | `O(E log E)` |
-| MST, dense graph | Prim | `O(E log V)` |
-| MST, parallel implementation | Borůvka | `O(E log V)` |
-| Network flow / matching / min-cut | See Chapter 9 |  |
+The negative-cycle detection is not a side effect but a feature. If you run Bellman-Ford on a graph of currency exchange rates where edge weights are the negative logarithm of exchange ratios, a negative cycle in that graph is a cycle of trades that ends with more money than you started with — an arbitrage opportunity.
 
-## Worked example — routing in a road network
+**Floyd-Warshall** solves a different problem: *all-pairs* shortest paths, meaning the shortest path between every pair of vertices simultaneously. The approach is dynamic programming. Initialize a distance matrix from the edge weights. Then, for each vertex `k` in turn, update every pair `(i, j)`: if the path from `i` to `j` through `k` is cheaper than the current best direct path, update it. Three nested loops, one over intermediate vertices `k`, two over all pairs `(i, j)`. Time: `O(V³)`. Space: `O(V²)` for the matrix.
 
-A logistics service computes route times between distribution centers. The road network has 10 million vertices (intersections) and 25 million edges (road segments) [verify]; edge weights are travel times in seconds. The same problem is solved three ways, for three reasons.
+Floyd-Warshall wins when you need all pairs and the graph is small enough. On dense graphs where `E ≈ V²`, running Dijkstra from every vertex costs `O(V² log V + V³ / log V)`, which is comparable to or worse than Floyd-Warshall's `O(V³)` — and Floyd-Warshall's inner loop is a tight matrix update with excellent cache behavior. For sparse all-pairs problems on larger graphs with possible negative edges, Johnson's algorithm reruns Dijkstra from each vertex after reweighting edges to eliminate negatives; time `O(VE log V)`.
 
-**Dijkstra (basic).** Source: a specific distribution center. Target: another distribution center. Run Dijkstra from source, stop when target is finalized. Time on a binary heap: roughly proportional to `(V + E) log V`. On the network above, this is roughly `7 × 10⁸ log V ≈ 1.6 × 10¹⁰` heap operations [verify]. Slow but correct. The result: the optimal route in seconds.
+**A\*** (A-star) is Dijkstra with a heuristic. Instead of keying the priority queue on the actual distance from source `g(v)`, it keys on `g(v) + h(v)`, where `h(v)` is an estimate of the remaining distance from `v` to the goal. When the heuristic is *admissible* — it never overestimates the true remaining distance — A\* is still optimal: it will find the shortest path. But it explores far fewer vertices, focusing the search in the direction of the goal rather than radiating outward uniformly.
 
-**A\* with great-circle heuristic.** Same graph, same source, same target. The heuristic `h(v)` is the great-circle distance from `v` to the target, divided by the maximum permitted speed. This is admissible because no route can be faster than the straight-line distance at the maximum speed. The search now expands vertices in roughly straight-line direction toward the target rather than radiating outward. On real road networks, A\* with this heuristic explores roughly 1–10% of the vertices Dijkstra explores [verify]. Same answer, often 10× to 100× faster.
+The classic heuristic for road networks is great-circle distance: the straight-line distance between two geographic points, which is a lower bound on road travel time if you divide by the maximum speed allowed on any road. On real road networks, A\* with this heuristic explores roughly 1 to 10 percent of the vertices that Dijkstra explores for the same source-target pair. Same answer, dramatically less work.
 
-The heuristic earns its place when it correlates well with actual distance. For a flat-Earth approximation on continental scales, great-circle distance correlates strongly with road distance; A\* dominates. In a maze where straight-line distance is a poor predictor of actual cost (many walls, dead ends), the heuristic informs little and A\* degrades toward Dijkstra.
+The heuristic's quality determines A\*'s advantage. In a maze where straight-line distance is a poor predictor of actual path cost — because walls force long detours — the heuristic informs little and A\* degrades toward Dijkstra. The quality of the heuristic is a claim about the geometry of the problem: whether the shortest path tends to go roughly in the direction of the goal.
 
-**Bellman-Ford (when toll pricing creates negative effective weights).** A pricing model offers rebates for taking certain toll roads at off-peak times — the rebate exceeds the toll and the resulting effective edge weight is negative. Dijkstra and A\* are now incorrect: both can finalize a vertex's distance before discovering the negative-effective-weight edge that would have given a cheaper route. Bellman-Ford handles this correctly in `O(VE)` time at the cost of being asymptotically slower. The pricing model breaks the assumption that justified Dijkstra; the algorithm choice tracks the change.
+<!-- → [IMAGE: two side-by-side grid graphs showing explored vertices for the same source-target pair — left panel Dijkstra (explored region radiates as a roughly circular blob), right panel A* with great-circle heuristic (explored region is a narrow corridor pointing toward the target); annotate the explored vertex counts on each; student should see concretely what "explores 1–10% of vertices" means] -->
 
-The lesson: the algorithm is determined by the constraints of the model, not by reflex. A change in pricing changes the model. A change in the model changes the right algorithm. Reading "Dijkstra is the shortest-path algorithm" without remembering the non-negative-weights constraint is the failure mode the next section engages.
+---
 
-## Failure modes — when "just use Dijkstra" misleads
+## Minimum Spanning Trees
 
-The misconception engaged: "Just use Dijkstra."
+A different kind of question: you want to connect all vertices in a weighted graph using the minimum total edge weight. Not shortest paths between pairs — a tree of edges that reaches every vertex as cheaply as possible. This is the minimum spanning tree (MST).
 
-Dijkstra is the right algorithm for single-source shortest path on a graph with non-negative edge weights and unbounded exploration budget. Outside that envelope, it fails or wastes work.
+Why would you want this? Network design, for one: you want to lay the minimum total cable to connect all offices. Clustering algorithms sometimes use MSTs to find structure in data. Any problem where you want to wire up a set of things at minimum total cost.
 
-**Negative edges.** Dijkstra is incorrect on negative weights. The algorithm finalizes a vertex's distance the first time it is extracted from the priority queue; with negative edges, a shorter path via the negative edge can be discovered later, but the finalized distance is never updated. Use Bellman-Ford. The toll-pricing case in the worked example is one production instance.
+Three classical algorithms, each with a different implementation trade-off.
 
-**Negative cycles.** No shortest path is well-defined when a negative cycle exists; Bellman-Ford reports the cycle. Currency arbitrage detection is a positive use of this property — a negative cycle in the log-rate graph is an arbitrage opportunity.
+**Kruskal's algorithm** thinks about edges. Sort all edges by weight. Iterate through them cheapest first. Add each edge to the MST unless it would create a cycle — which you detect using a data structure called Union-Find (Chapter 3) that tracks which vertices are already connected. Time: `O(E log E)`, dominated by the sort. Natural fit for sparse graphs where `E` is small relative to `V²`.
 
-**A goal node, but Dijkstra explores everywhere.** Plain Dijkstra computes shortest paths to *all* reachable vertices. If you have a single target, A\* with a good heuristic explores a fraction of the graph. The right call when the target is known and a heuristic is available.
+**Prim's algorithm** thinks about vertices. Start from any vertex. At each step, add the cheapest edge that connects the current partial tree to a vertex not yet in it. Use a priority queue to find that cheapest edge efficiently. Time: `O(E log V)` with a binary heap. Natural fit for dense graphs.
 
-**All-pairs query, sparse graph.** Running Dijkstra `V` times costs `O(V(V+E) log V)`. On sparse graphs with possibly-negative edges, Johnson's algorithm wins.
+Both algorithms are greedy: they always take the locally cheapest option. The proof that both are correct rests on the *cut property*: for any partition of vertices into two sets, the minimum-weight edge crossing the partition belongs to some MST. Kruskal and Prim both, in different ways, repeatedly apply this property.
 
-**All-pairs query, dense graph, small V.** Running Dijkstra `V` times costs `O(V² log V + VE)`. Floyd-Warshall is `O(V³)`, simpler, and often wins because the inner loop is a tight matrix update with excellent cache behavior.
+**Borůvka's algorithm**, the oldest of the three (1926), has each component independently find its cheapest outgoing edge and merge. Because components work independently, it's naturally parallel. Useful when the graph is too large to process centrally or when parallel hardware is available.
 
-**The graph fits in memory but the search dominates.** Bidirectional search runs two simultaneous searches from source and target; meeting in the middle reduces the explored region by roughly square-root [verify]. Useful as an A\* alternative or complement.
+<!-- → [IMAGE: step-by-step construction of an MST on the same 8-vertex weighted graph using Kruskal's algorithm — show the edge list sorted by weight at top, then four stages: initial state (no edges added), after adding cheapest edge, after adding second, after completion; highlight in each stage which edge was considered and whether it was added or rejected (would create cycle); student should see the algorithm as a physical process, not just pseudocode] -->
 
-**The graph is huge and unweighted.** BFS, not Dijkstra. The priority queue overhead is unjustified when all weights are 1.
+---
 
-The corrective heuristic: state the problem (single-source vs all-pairs, presence of negative weights, presence of a heuristic, weighted vs unweighted), then pick the algorithm that matches. Dijkstra is the right answer for one specific problem shape; that shape covers many real cases but not all.
+## When "Just Use Dijkstra" Goes Wrong
 
-## Cross-references
+The most common mistake in graph algorithms is not misimplementing an algorithm but misapplying one. Dijkstra is the shortest-path algorithm people reach for by reflex, and it's wrong in several situations.
 
-For heap-based priority queues underlying Dijkstra and Prim, see Chapter 3 §4. For Union-Find underlying Kruskal, see Chapter 3 §6. For the DP framing of Bellman-Ford and Floyd-Warshall, see Chapter 8. For MST as a canonical greedy-on-matroid, see Chapter 6. For network flow extending the graph model with capacities, see Chapter 9. For randomized graph algorithms (Karger's min-cut), see Chapter 12.
+**Negative edges.** As argued above, Dijkstra finalizes distances and cannot revise them. Use Bellman-Ford.
 
-## Companion-page handoffs
+**Negative cycles.** No well-defined shortest path exists. Bellman-Ford will report the negative cycle.
 
-OSM-based routing demos with full code; comparative performance benchmarks across graph sizes and density; visualizations of BFS and DFS traversal orders; A\* with various heuristics on real road networks; SCC computation walkthroughs (Tarjan's and Kosaraju's); negative-cycle detection examples. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-5.
+**A specific target, not all reachable vertices.** Dijkstra computes shortest paths to *every* reachable vertex. If you only need the path to one target, A\* with a good heuristic explores a fraction of the graph.
 
-## What this chapter does not enable
+**All-pairs queries on a dense small graph.** Running Dijkstra `V` times costs `O(V² log V + VE)`. Floyd-Warshall costs `O(V³)` but with a simpler, cache-friendly inner loop — on dense graphs with small `V`, Floyd-Warshall often wins in practice.
 
-This chapter does not cover advanced graph topics — graph isomorphism, planarity testing, treewidth, graph minors, spectral graph theory, hypergraphs. Those are research-level material; for graph isomorphism in particular, the breakthrough by Babai (2015) [verify] is at the frontier of theoretical algorithms. The chapter also does not cover the specific algorithms used at planetary scale by mapping services (contraction hierarchies, transit-node routing, customizable route planning); those are layered on top of the classical algorithms here and live in the routing-systems literature.
+**Unweighted graphs.** Dijkstra's priority queue overhead is unjustified when all edges have weight 1. BFS is linear and simpler.
 
-## Capability statement
+**Huge graphs where the search itself dominates.** Bidirectional search runs two simultaneous searches from source and target, meeting in the middle; the explored region shrinks by roughly the square root. Applicable as an extension to Dijkstra or A\*.
 
-You can now identify when a problem is a graph problem, choose between adjacency-list and adjacency-matrix representations, pick the right traversal for the question being asked, distinguish the four classical shortest-path algorithms by their preconditions, choose an MST algorithm given graph density, and recognize the failure modes of each. The next time a problem arrives that involves connections — between cities, computers, tasks, or people — the path from problem to algorithm is in your hands.
+The corrective habit is simple: state the problem before picking the algorithm. Single-source or all-pairs? Weighted or unweighted? Negative weights possible? Is there a specific target and a useful heuristic? Each answer rules out some algorithms and points to others. The decision is in the constraints of the model, not in reflex.
 
+---
+
+## How the Model Determines the Algorithm
+
+Here is a concrete instance of why this matters. A logistics service computes route times between distribution centers on a road network with tens of millions of intersections and edges weighted by travel time in seconds. Three different versions of the same problem demand three different algorithms.
+
+In the basic version, you want the fastest route between two specific distribution centers. Dijkstra with a binary heap, stopped when the target vertex is finalized. Correct and fast.
+
+In the improved version, you still want the same route, but you want it computed quickly enough to respond to a live user. A\* with a great-circle heuristic explores a small fraction of the graph — the heuristic focuses the search toward the destination. Same answer, often ten to a hundred times faster.
+
+In the pricing-model version, the company has implemented variable toll pricing where certain tolls offer rebates at off-peak hours. The rebate can exceed the toll, making the effective edge weight negative. Dijkstra and A\* are now incorrect: they can finalize a vertex's distance before discovering the negative-effective-weight toll road that would have yielded a cheaper route. Bellman-Ford is correct at the cost of being slower.
+
+The algorithm changed because the model changed. A change in business requirements — adding a rebate pricing system — changed the graph's properties, which changed the correct algorithm. Reading "Dijkstra is the shortest-path algorithm" without remembering the non-negative-weights precondition is the failure mode. The preconditions are not fine print. They are the definition of what problem the algorithm solves.
+
+<!-- → [TABLE: algorithm selection guide — rows: Dijkstra, Bellman-Ford, Floyd-Warshall, A*, BFS; columns: single-source or all-pairs, negative weights allowed, specific target, unweighted, time complexity; fill each cell with yes/no/N/A and the complexity; student should be able to run down the columns for their problem and arrive at the right row] -->
+
+---
+
+## What You Can Do Now
+
+You can identify when a problem is a graph problem — when the question involves reachability, shortest paths, connectivity, cycles, or ordering, the structure to reach for is a graph. You can choose between adjacency-list and adjacency-matrix representations based on graph density. You can pick between BFS (minimum hops, unweighted) and DFS (cycles, components, topological ordering) based on what you want to know. You can distinguish the four classical shortest-path algorithms by their preconditions: Dijkstra for non-negative weights, Bellman-Ford for negative weights, Floyd-Warshall for all-pairs on dense small graphs, A\* when you have a target and a heuristic. You can choose between Kruskal and Prim for MST based on graph density.
+
+More fundamentally: you can see a new problem, draw the graph, and let the structure tell you which algorithm applies. That's the skill. The algorithms themselves are tools; the skill is recognizing which tool fits.
+
+The next two chapters build directly on this foundation. Chapter 6 shows how the greedy structure behind Kruskal's and Prim's MST algorithms generalizes to an entire class of optimization problems — matroids — and why greedy works when it works. Chapter 8 shows how Bellman-Ford and Floyd-Warshall are instances of dynamic programming, and how the same principle extends to shortest paths in graphs you haven't drawn yet.
+
+---
+
+## Exercises
+
+### Warm-Up
+
+**1.** For each of the following problems, state whether it is a graph problem. If it is, name the vertices, the edges, and the question being asked. If it isn't, explain why the graph model doesn't add anything.
+
+- Finding all prerequisites you must complete before taking a given course
+- Sorting a list of numbers in ascending order
+- Detecting whether two users in a social network are connected by fewer than six degrees of separation
+- Finding the longest substring in a text without repeating characters
+
+*Tests: recognizing when the graph abstraction applies; translating a real-world problem into vertices, edges, and a graph question.*
+
+**2.** You are given a small graph stored as an adjacency matrix and asked to convert it to an adjacency list. The graph has 5 vertices and 4 edges. After converting:
+
+(a) Which representation uses less memory? By how much (in terms of V and E)?
+
+(b) If the graph instead had 5 vertices and all possible edges (a complete graph), which representation would be more efficient, and why?
+
+(c) A colleague proposes always using the adjacency matrix "because edge lookups are O(1)." Under what conditions is this advice correct? When does it lead you astray?
+
+*Tests: adjacency list vs. matrix trade-offs; reasoning about sparse vs. dense graphs.*
+
+**3.** Trace BFS and DFS on the following graph starting from vertex A. (Draw or describe the graph: A connects to B and C; B connects to D and E; C connects to F; D, E, F have no outgoing edges.)
+
+(a) Give the vertex visit order for BFS.
+
+(b) Give the vertex visit order for DFS (assume neighbors are processed in alphabetical order).
+
+(c) Which traversal would you use to find the minimum number of edges between A and F? Why?
+
+*Tests: tracing BFS and DFS; selecting the right traversal for a path-length question.*
+
+---
+
+### Application
+
+**4.** Apply Dijkstra's algorithm to the following weighted directed graph. Source vertex: A.
+
+Edges: A→B (weight 4), A→C (weight 2), B→D (weight 3), B→C (weight 1), C→B (weight 1), C→D (weight 5), D→E (weight 1).
+
+Show the state of the priority queue after each extraction step. Give the final shortest distances from A to every other vertex.
+
+*Tests: executing Dijkstra correctly; tracking priority queue state; reading off final distances.*
+
+**5.** The graph from Exercise 4 has an edge added: E→A (weight −8). Dijkstra's algorithm, run from A, produces an incorrect answer.
+
+(a) Identify which vertex's distance is incorrectly finalized and explain why.
+
+(b) Run Bellman-Ford on the modified graph. Does it detect a negative cycle? Show the distances after each of the required iterations.
+
+(c) What does the negative cycle mean for the question "what is the shortest path from A to E in this graph?"
+
+*Tests: identifying Dijkstra's failure mode on negative edges; applying Bellman-Ford; reasoning about negative cycles and their consequences.*
+
+**6.** You are designing a system that must answer "what is the shortest travel time between any two cities?" for a network of 200 cities with direct flight connections (all travel times positive). Two approaches are proposed: (a) run Dijkstra from each of the 200 cities, or (b) run Floyd-Warshall once.
+
+For each approach, give the time complexity in terms of V (cities) and E (edges). Identify the conditions under which Floyd-Warshall wins despite having `O(V³)` complexity. Your answer should reference the graph's density and the constant-factor behavior of Floyd-Warshall's inner loop.
+
+*Tests: comparing all-pairs approaches; applying Floyd-Warshall's trade-off against repeated Dijkstra.*
+
+---
+
+### Synthesis
+
+**7.** A mapping application wants to find the fastest walking route between two points in a city. The street network has 500,000 intersections (vertices) and 1.2 million street segments (edges), all with positive weights representing walking time in seconds.
+
+(a) Which shortest-path algorithm should the application use for each of these requirements? Justify each choice with reference to the algorithm's preconditions and the problem's constraints.
+
+- Fastest path between two specific intersections, no latency budget
+- Fastest path between two specific intersections, must respond in under 50 ms
+- Fastest path between all pairs of intersections (for precomputation)
+
+(b) For the 50 ms requirement, describe what property the heuristic must satisfy for correctness, and propose a specific heuristic. Explain why it satisfies that property.
+
+*Tests: selecting algorithms from their preconditions across varied requirements; constructing and validating an admissible heuristic.*
+
+**8.** A build system represents software packages as vertices and dependencies as directed edges — package A points to package B if A depends on B. The system needs to determine a valid build order (build dependencies before the packages that depend on them).
+
+(a) What graph property must hold for a valid build order to exist? Which traversal detects the violation?
+
+(b) Which traversal produces the build order, and what is the output called? Describe the algorithm in terms of DFS.
+
+(c) Suppose a new requirement is added: among all valid build orders, choose the one that minimizes total build time (each package has an estimated build duration). Is this still a graph traversal problem, or has it become something else? Name the new problem class.
+
+*Tests: applying DFS to topological sort; recognizing when a graph problem becomes a different kind of optimization problem.*
+
+---
+
+### Challenge
+
+**9.** The negative-cycle detection property of Bellman-Ford is used in currency arbitrage detection. Construct the graph model explicitly: given a set of currencies and pairwise exchange rates, define the vertices, the edge weights (as a formula involving the exchange rates), and the graph property whose presence signals an arbitrage opportunity.
+
+Your answer should explain why the negative logarithm transformation converts the multiplicative arbitrage condition into an additive graph property, and why that matters for the algorithm. If you have access to real exchange rate data, verify that no negative cycle exists in the current rate table (or find one if it does).
+
+*Tests: constructing a graph model from a financial problem; applying logarithmic transformation to convert multiplicative to additive; connecting Bellman-Ford's negative-cycle detection to a real-world use case.*
+
+**10.** A\* is guaranteed to find the optimal path when the heuristic is admissible. But "optimal" depends on what you're optimizing. Suppose you want the path that minimizes the *maximum single-edge weight* along the route (the "bottleneck shortest path" — useful for finding the route with the least-congested segment).
+
+(a) Does Dijkstra solve this problem as stated? If not, what modification would be needed?
+
+(b) Can A\* be adapted for this objective? What would admissibility mean for a heuristic in this context?
+
+(c) Is there a simpler algorithm — perhaps involving MSTs — that solves the bottleneck shortest path problem more directly?
+
+*Tests: recognizing when standard algorithms solve a problem and when they need modification; reasoning about what "optimality" means for non-standard objectives; connecting shortest-path and MST problems.*
 
 ---
 
