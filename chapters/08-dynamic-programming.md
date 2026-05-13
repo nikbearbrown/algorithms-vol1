@@ -1,188 +1,266 @@
-# Dynamic Programming
+# Chapter 8 — Dynamic Programming
 
-## TL;DR
+*What it means to remember what you've already figured out.*
 
-Dynamic programming (DP) solves a problem by combining solutions to overlapping subproblems, remembering each subproblem's answer rather than recomputing it. Reach for this chapter when a problem has optimal substructure *and* overlapping subproblems — when a recursive formulation would recompute the same subproblems exponentially many times. After consulting it, you can recognize DP-amenable structure, write a recurrence, choose top-down memoization or bottom-up tabulation, and apply space optimization when the table is the constraint.
+---
 
-## Recognition pattern
+Here is a question about counting. How many ways can you make change for a dollar using quarters, dimes, nickels, and pennies? You could enumerate all the combinations — there are 242 of them — but the more interesting question is how you'd write a program to count them. A naive approach would recurse: to count ways to make a dollar, count ways to make a dollar minus one penny with pennies available, plus ways to make a dollar minus one nickel with nickels available, and so on. Work through the recursion tree and you'll find the same sub-question appearing hundreds of times. "How many ways to make 50 cents using only dimes and nickels?" gets computed not once but over and over, identical work repeated at every branch of the tree that leads to it.
 
-Two properties together signal DP.
+This is the problem dynamic programming solves. Not a lack of insight, not a complicated algorithm — just the observation that in a large class of problems, a naive recursion recomputes the same thing exponentially many times when it only needs to compute it once.
 
-*Optimal substructure.* The optimal solution to the problem can be constructed from optimal solutions to its subproblems. This is the same property greedy and D&C require — DP is not unique here.
+---
 
-*Overlapping subproblems.* The same subproblems are encountered multiple times during a naive recursive computation. This is what distinguishes DP from D&C. Naive recursive Fibonacci computes `F(n-2)` twice, `F(n-3)` three times, `F(n-4)` five times — `O(2^n)` total work for `O(n)` distinct subproblems. Memoization collapses the recomputation.
+## The Two Properties You're Looking For
 
-A third signal worth checking: the subproblem space is small enough to enumerate. DP works when the number of distinct subproblems is polynomial. For the longest common subsequence of two strings of lengths `m` and `n`, there are `mn` distinct subproblems — manageable. For the traveling salesman with bitmask states, there are `n · 2^n` subproblems — exponential, but small enough for `n ≤ 20` or so. For problems whose subproblem space is genuinely exponential and not amenable to bitmask compression, DP is not the tool.
+Before you can apply dynamic programming, you have to recognize when it applies. Two properties together signal it.
 
-A signal DP is *not* the right approach: subproblems are independent (D&C, Chapter 7) or the matroid structure holds (greedy, Chapter 6). When greedy works, DP also works but pays an unnecessary `O(n)` or `O(n²)` factor. The misconception engaged in §10 — continuing from Chapter 6 — is the inverse: that DP is the rigorous default and greedy is the sloppy shortcut. When greedy is provably optimal, it is rigorous and cheaper.
+The first is *optimal substructure*. The optimal solution to the whole problem can be built from optimal solutions to smaller subproblems. If you're finding the shortest path from A to Z and the optimal path goes through M, then the portion of the path from A to M must itself be a shortest path from A to M — otherwise you could swap it for a shorter one and improve the overall path. This is optimal substructure. Greedy algorithms and divide-and-conquer both rely on it too; it's not unique to dynamic programming.
 
-## What you need to know first
+The second is *overlapping subproblems*. The same subproblems appear repeatedly in a naive recursive formulation. This is what distinguishes dynamic programming from divide-and-conquer. Merge sort divides a list and recursively sorts each half — but the two halves are independent, they never share subproblems. Fibonacci, on the other hand: computing `F(n)` calls `F(n-1)` and `F(n-2)`; computing `F(n-1)` calls `F(n-2)` and `F(n-3)`; `F(n-2)` appears twice already, and the repetition compounds exponentially. There are only `n` distinct Fibonacci numbers to compute, but naive recursion computes `O(2ⁿ)` of them.
 
-This chapter assumes Big O and recurrences (Chapter 2 §3–4), basic recursion (companion-page refresher), and the contrast with D&C (Chapter 7). For Bellman-Ford as a DP algorithm on graphs, see Chapter 5 §5. For the contrast with greedy, see Chapter 6 §10. Recurrence design — the load-bearing skill of this chapter — has no shortcut; the worked examples and §3 walkthrough are how you build it.
+Dynamic programming collapses that redundancy. Compute each subproblem once. Store the result. When you need it again, look it up.
 
-## Designing a DP recurrence
+<!-- → [IMAGE: recursion tree for F(6) — show the full binary tree with each node labeled F(k); highlight duplicate subtrees in a distinct color (F(4) appears twice, F(3) three times, F(2) five times); annotate total node count as O(2ⁿ) vs. distinct subproblems as n; student should see viscerally why the redundancy is exponential and why caching collapses it to linear] -->
 
-Designing a DP solution is a four-step process. The third step is where most of the difficulty lives.
+A third thing worth checking is that the subproblem space is manageable. DP works when the number of distinct subproblems is polynomial. For the longest common subsequence of two strings of lengths `m` and `n`, there are `mn` distinct subproblems — fine. For the traveling salesman problem with bitmask states, there are `n · 2ⁿ` subproblems — still exponential, but manageable up to about `n = 25`. For problems whose subproblem space is genuinely exponential with no compressible structure, DP won't save you.
 
-**1. Define the subproblem.** State precisely what `OPT(i)` (or `OPT(i, j)`, etc.) represents. This is harder than it looks. "Maximum value achievable using items 1 through `i`" is a definition. "The DP value at index `i`" is not. The subproblem definition determines everything that follows.
+---
 
-**2. State the recurrence.** Express `OPT(i)` in terms of smaller subproblems. The recurrence usually has the form `OPT(i) = best of (option A using OPT(i-1), option B using OPT(i-2), ...)`. Each option corresponds to a decision the algorithm makes at this step.
+## How to Design a Recurrence
 
-**3. Identify the base case.** What is `OPT(0)`, `OPT(empty)`, or whatever the smallest subproblem is? Wrong base cases produce subtle off-by-one errors that pass small tests and fail at scale.
+The actual skill in dynamic programming is not implementing the algorithm — once you have a recurrence, implementation is mechanical. The skill is designing the recurrence. Four steps, with the difficulty concentrated in the third.
 
-**4. Choose evaluation order.** Top-down (recursion + memoization, fill the table on demand) or bottom-up (iteration, fill the table in dependency order). Top-down is closer to the recursive specification and easier to write correctly; bottom-up has lower constant overhead and enables space optimization.
+**Define the subproblem.** Say precisely what `OPT(i)`, or `OPT(i, j)`, or whatever your subproblem index is, actually means. Not "the DP value at `i`" — that's circular. Something like: "the maximum total value achievable from items `1` through `i` in a knapsack of remaining capacity `w`." The definition names the state space. Everything else derives from it.
 
-The recurrence is the artifact. Once it is written and verified, the implementation is mechanical.
+**Write the recurrence.** Express `OPT(i)` in terms of strictly smaller subproblems. This is usually a `min` or `max` over the choices available at step `i`: take item `i` or don't, match characters or skip, split the matrix chain here or there. Each choice has a cost, and the optimal is the best of them.
 
-## Top-down vs bottom-up
+**Identify base cases.** What is `OPT(0)`? `OPT(0, j)`? `OPT(i, 0)`? These are the smallest subproblems, where the recursion bottoms out. Wrong base cases are the most common source of subtle bugs — the logic of the recurrence is right but the answer is off by one everywhere. Test against small examples you can verify by hand before you trust the code on large inputs.
 
-**Top-down (memoization).** Write the recursive function as the recurrence specifies. Cache results in a hash table or array. On every call, check the cache first; compute and store on miss.
+**Choose evaluation order.** Two options: top-down or bottom-up. I'll come back to this.
 
-```
-def OPT(i):
-    if i in memo: return memo[i]
-    if i == base_case: return base_value
-    result = recurrence(...)
-    memo[i] = result
-    return result
-```
+The recurrence is the artifact. If the recurrence is right, the rest is just filling in a table.
 
-Pros: tracks the recurrence directly; computes only the subproblems actually needed; easy to add new state dimensions.
+<!-- → [INFOGRAPHIC: the four-step recurrence design process as a vertical flow — (1) Define subproblem: annotate that the definition must name the state precisely, show a good vs. bad example side by side; (2) Write recurrence: show the min/max branching structure; (3) Base cases: flag this as where most bugs live; (4) Evaluation order: branch to top-down and bottom-up; student should be able to use this as a checklist when designing their first recurrence] -->
 
-Cons: function-call overhead; stack-depth limits on recursion; harder to space-optimize.
+---
 
-**Bottom-up (tabulation).** Allocate a table indexed by subproblem identifier. Fill the table in an order that ensures every dependency is computed before it is read.
+## Top-Down and Bottom-Up
 
-```
-table[base_case] = base_value
-for i in increasing order of dependency:
-    table[i] = recurrence(table[smaller_indices])
-return table[final]
-```
+There are two ways to evaluate a DP recurrence, and they're equivalent in the answers they produce. They differ in how they traverse the subproblem space.
 
-Pros: tight loop, no recursion overhead; enables space optimization (often only the last row or two is needed); cache-friendly when access pattern is regular.
+**Top-down memoization** writes the recursion as the recurrence specifies, but caches results. When the function is called with argument `i`, it first checks whether `OPT(i)` has already been computed; if so, it returns the cached value immediately. If not, it computes the value by calling itself recursively on smaller subproblems, stores the result, and returns it. The function touches each distinct subproblem exactly once, but only the subproblems that are actually needed.
 
-Cons: must determine dependency order explicitly; computes all subproblems even if some are not needed.
+This is the closer formulation to the mathematical recurrence. You write what the problem means, not how to fill a table. It's easier to get right initially and easier to extend with new state dimensions. The cost is function-call overhead, recursion depth limits (Python defaults to 1,000 frames), and slightly harder space optimization.
 
-The choice is often style or constraint-driven. For prototyping, top-down is faster to write. For production, bottom-up is faster to run and easier to optimize.
+**Bottom-up tabulation** allocates an array or grid indexed by subproblem identifier and fills it in dependency order — ensuring that when you compute `OPT(i)`, all smaller subproblems it references have already been computed. For a 1D recurrence this usually means iterating `i` from 0 to `n`. For a 2D recurrence this usually means filling row by row or along diagonals, depending on which earlier entries each cell reads.
 
-## Space optimization
+The bottom-up approach has lower overhead — it's just array accesses in a loop — and it makes space optimization straightforward. If the recurrence at row `i` depends only on row `i-1`, you only need to store two rows at a time. The cost is that you must think explicitly about dependency order, and you compute all subproblems even if some are never needed.
 
-A DP table that is `O(n)` wide and `O(n)` tall costs `O(n²)` space. Often, the recurrence at row `i` depends only on row `i-1` (and sometimes `i-2`). When that is true, the table can be reduced to two rows (or one), bringing space down to `O(n)`.
+In practice: top-down for prototyping and correctness, bottom-up for production when speed or memory is the constraint. For most problems the choice is stylistic. For very large inputs where space optimization matters, bottom-up wins.
 
-Edit distance is a canonical example. The full `(m+1) × (n+1)` table costs `O(mn)` space. Each row depends only on the previous row, so two `O(n)` arrays alternate — current row and previous row. Memory drops from gigabytes to megabytes for long sequences.
+<!-- → [TABLE: top-down vs. bottom-up comparison — rows: implementation form, subproblems computed, recursion overhead, space optimization ease, best used when; fill each cell concisely; student should be able to make the choice in under a minute for a new problem] -->
 
-The cost: traceback (reconstructing the optimal solution, not just its value) becomes harder. With the full table you can walk back from `(m, n)` to `(0, 0)`. With two rows you can compute the optimal value but not the alignment. Hirschberg's algorithm (1975) [verify] recovers the alignment in `O(m + n)` space using a divide-and-conquer combination of forward and backward passes.
+---
 
-Space-optimize when the optimal value is what you need; keep the full table when traceback is required (or use Hirschberg).
+## The Idea, Made Concrete: Edit Distance
 
-## Canonical DP problems
+The best single example of dynamic programming — the one that shows both the technique and its reach — is edit distance.
 
-**Fibonacci.** The introductory DP problem. `F(n) = F(n-1) + F(n-2)`. Naive recursion: `O(2^n)`. DP: `O(n)` time, `O(n)` space, or `O(1)` space with rolling variables.
+Given two strings, the edit distance between them is the minimum number of single-character operations — insertions, deletions, or substitutions — needed to transform one string into the other. Transform "kitten" into "sitting" and you need six operations. Transform "Saturday" into "Sunday" and you need three. The algorithm to compute this was described by Levenshtein in 1965 and the standard DP formulation by Wagner and Fischer in 1974.
 
-**0/1 knapsack.** Pick a subset of `n` items, each with weight `w_i` and value `v_i`, maximizing total value subject to total weight `≤ W`. Recurrence: `OPT(i, w) = max(OPT(i-1, w), OPT(i-1, w - w_i) + v_i)` if `w_i ≤ w`, else `OPT(i-1, w)`. Time and space: `O(nW)`. This is *pseudo-polynomial* — polynomial in the values of the inputs but not in their bit length. For `W` exponentially large in `n`, the algorithm is exponential.
+Define `OPT(i, j)` as the edit distance between the first `i` characters of string `A` and the first `j` characters of string `B`.
 
-**Longest common subsequence (LCS).** Length of the longest subsequence shared by two strings. Recurrence: if `A[i] = B[j]`, `OPT(i, j) = OPT(i-1, j-1) + 1`; else `max(OPT(i-1, j), OPT(i, j-1))`. Time `O(mn)`, space `O(mn)` or `O(min(m, n))` optimized.
+Base cases: `OPT(i, 0) = i` — to transform `A[1..i]` to an empty string, delete all `i` characters. `OPT(0, j) = j` — to build `B[1..j]` from nothing, insert `j` characters.
 
-**Edit distance.** Minimum edits (insertion, deletion, substitution) to transform one string into another. Worked example below.
+Recurrence: for any `i > 0` and `j > 0`, look at the last characters `A[i]` and `B[j]`. Three choices:
 
-**Matrix chain multiplication.** Given matrices `A_1, A_2, ..., A_n` with compatible dimensions, find the parenthesization that minimizes scalar multiplications. Time `O(n³)`, space `O(n²)`. The recurrence: `OPT(i, j) = min over k in [i, j) of (OPT(i, k) + OPT(k+1, j) + cost(merge))`.
+- Delete `A[i]`: costs 1, and the remaining problem is `OPT(i-1, j)`.
+- Insert `B[j]`: costs 1, and the remaining problem is `OPT(i, j-1)`.
+- Substitute (or match): if `A[i] = B[j]`, cost is 0; if not, cost is 1; and the remaining problem is `OPT(i-1, j-1)`.
 
-**Optimal binary search tree.** Given access frequencies for keys, build the BST minimizing expected access cost. Time `O(n³)`, reducible to `O(n²)` via Knuth's optimization (1971) [verify].
+So:
 
-**Bellman-Ford.** Single-source shortest paths with possibly-negative edges via `|V|−1` iterations of edge relaxation. The recurrence is over `(vertex, iteration)` pairs. See Chapter 5 §5.
+$$\text{OPT}(i, j) = \min\left(\text{OPT}(i-1, j) + 1,\; \text{OPT}(i, j-1) + 1,\; \text{OPT}(i-1, j-1) + [A[i] \neq B[j]]\right)$$
 
-**Floyd-Warshall.** All-pairs shortest paths via `OPT(i, j, k) = min(OPT(i, j, k-1), OPT(i, k, k-1) + OPT(k, j, k-1))` for paths using intermediate vertices in `{1, ..., k}`. Time `O(V³)`, space `O(V²)`. See Chapter 5 §5.
+where `[A[i] ≠ B[j]]` is 1 if the characters differ and 0 if they match.
 
-**Subset sum / partition.** Pseudo-polynomial DP on a set's possible subset sums. Used in cryptanalysis, combinatorial design, and as a teaching example for NP-hard problems with practical DP solutions.
+Fill in an `(m+1) × (n+1)` table, where `m` and `n` are the string lengths. Every cell looks left, up, and diagonally up-left. The answer is in the bottom-right corner.
 
-**Held-Karp TSP.** Traveling salesman in `O(n² · 2^n)` time and `O(n · 2^n)` space using bitmask DP over subsets. Beats brute-force `O(n!)` substantially but still exponential. Solves TSP exactly for `n` up to about 20–25 [verify]. See Chapter 10 for what to do when `n` is larger.
+<!-- → [IMAGE: fully filled edit distance table for "kitten" vs "sitting" (7×8 grid) — annotate the base case row and column; trace the three arrow directions (left=insert, up=delete, diagonal=substitute/match) from one interior cell; highlight the traceback path from bottom-right to top-left that recovers the optimal alignment; student should be able to read off the edit operations from the path and verify the count of 6] -->
 
-## Decision rules
+Time: `O(mn)`. Space: `O(mn)` for the full table, or `O(min(m, n))` if you only need the distance and not the alignment — because each row depends only on the previous row, you can alternate between two arrays.
 
-| Problem signature | Approach |
-| --- | --- |
-| Optimal substructure + overlapping subproblems | DP |
-| Optimal substructure + independent subproblems | D&C (Chapter 7) |
-| Optimal substructure + matroid / exchange argument | Greedy (Chapter 6) |
-| Recurrence depends only on previous row | Bottom-up with `O(width)` space |
-| Recurrence has irregular dependency pattern | Top-down with memoization |
-| Need optimal value only | Space-optimize |
-| Need optimal solution (traceback) | Keep full table or use Hirschberg's algorithm |
-| Subproblem space exponential, no bitmask compression | DP fails — try approximation (Chapter 11) or randomization (Chapter 12) |
-| Pseudo-polynomial OK (small numeric input) | DP works (knapsack, subset-sum) |
+Why does this work? Because the problem has optimal substructure: any optimal edit sequence either matches the last characters, deletes the last character of `A`, or inserts the last character of `B`. Whatever it does at the end, the remaining operations on the shorter prefix must themselves be optimal — if they weren't, you could replace them with something better. And the subproblems overlap: `OPT(i-1, j-1)` is referenced from `OPT(i, j)`, `OPT(i+1, j)`, `OPT(i, j+1)`, and so on.
 
-## Worked example — edit distance in production
+A greedy algorithm fails here. The locally cheapest edit at one position can force expensive edits elsewhere — there's no way to make a locally good decision without knowing the full context of what follows. Dynamic programming is the matched tool.
 
-The edit distance (Levenshtein distance) between two strings is the minimum number of single-character edits — insertions, deletions, substitutions — to transform one string into the other. Levenshtein 1965 [verify], with the standard DP solution attributed to Wagner-Fischer 1974 [verify].
+---
 
-**Recurrence.** Let `OPT(i, j)` = edit distance between `A[1..i]` and `B[1..j]`.
+## Space Optimization
 
-Base cases: `OPT(i, 0) = i` (delete `i` characters), `OPT(0, j) = j` (insert `j` characters).
+The `O(mn)` table for edit distance is fine when `m` and `n` are thousands. When they're hundreds of thousands — as in DNA sequence alignment, where sequences can be millions of characters long — the full table is unworkable. Two strings of length 10⁵ would require `10¹⁰` cells. That's too much memory by several orders of magnitude.
 
-Recurrence:
-```
-OPT(i, j) = min(
-    OPT(i-1, j) + 1,                                  # delete A[i]
-    OPT(i,   j-1) + 1,                                # insert B[j]
-    OPT(i-1, j-1) + (0 if A[i] == B[j] else 1)        # substitute (or match)
-)
-```
+The space optimization exploits a simple observation: the recurrence for row `i` reads only from row `i-1`. You don't need the entire table. Keep two arrays — the current row and the previous row — and alternate. Memory drops from `O(mn)` to `O(min(m, n))`.
 
-Time: `O(mn)`. Space: `O(mn)` for the full table or `O(min(m, n))` for the value-only version. For two strings of length 10⁵, the full table is 10¹⁰ cells — unworkable. The space-optimized version is 10⁵ cells — trivial.
+<!-- → [IMAGE: side-by-side comparison of full table vs. two-row optimization for the same edit distance computation — left: full (m+1)×(n+1) grid with all cells filled, shaded to show that only the last two rows are ever read; right: two horizontal arrays labeled "prev" and "curr" alternating, with arrows showing which cells feed into the current computation; annotate memory cost of each; student should see exactly what is discarded and what is retained] -->
 
-**Production applications.**
+The cost is that you lose the ability to reconstruct the optimal alignment. With the full table you can trace back from `OPT(m, n)` to `OPT(0, 0)`, following the choices that produced the minimum at each cell, and recover the actual edit sequence. With two rows you only have the final distance, not the path.
 
-*Spell checking.* The autocomplete and spell-check engines in mobile keyboards, web browsers, and IDEs use edit distance (often with weighted operations or transposition included — Damerau-Levenshtein) to rank suggestions. Time per word is `O(d · L)` where `d` is the dictionary size and `L` is word length, made tractable in practice by indexing structures like BK-trees or Levenshtein automata. [verify] specific implementation details for any cited engine.
+When you need both the distance and the alignment on long sequences, Hirschberg's algorithm (1975) recovers the alignment in `O(m + n)` space using a divide-and-conquer combination of forward and backward passes over the table. The alignment is recovered recursively. The time remains `O(mn)`, but the space drops from `O(mn)` to `O(m + n)`. The derivation is one of the more elegant constructions in the algorithms canon, and it applies the divide-and-conquer idea from Chapter 7 to a DP problem.
 
-*DNA sequence alignment.* The Needleman-Wunsch algorithm (1970) [verify] is global edit distance with a substitution-cost matrix tuned to biological substitution rates. Smith-Waterman (1981) [verify] is the local-alignment variant — find the best-scoring substring alignment rather than aligning entire sequences. Both are `O(mn)` DP. Modern bioinformatics pipelines use heuristic prefilters (BLAST, HMMER) to reduce the candidate set, then run full DP on the survivors.
+---
 
-*Fuzzy string matching in databases.* Searching for near-matches of a user-supplied query string is edit distance computed against an index. PostgreSQL's `pg_trgm` extension uses trigram similarity as a fast filter; full edit distance is computed on candidates that survive the filter. [verify] specific extension behavior.
+## The Catalog of Standard Patterns
 
-*Source-code diff.* The `diff` utility computes the longest common subsequence of two file versions, equivalent to a unit-cost edit distance. Myers' algorithm (1986) [verify] computes the diff in `O((m+n)D)` time where `D` is the number of differences, beating standard `O(mn)` when the files are similar.
+There is a small set of DP patterns that recur across a wide range of problems. Recognizing your problem as an instance of a known pattern is most of the work.
 
-*Code-completion ranking.* Modern editors rank completion candidates by a combination of frequency, scope, and edit distance from the typed prefix. The DP runs on every keystroke in tight time budgets; space optimization is essential.
+**1D recurrence over a sequence.** The subproblem is defined over a single index, and the recurrence looks a few positions back. Fibonacci is the trivial case. Weighted interval scheduling — pick a non-overlapping set of intervals to maximize total weight — reduces to a 1D recurrence once intervals are sorted by finish time.
 
-**Why DP is the right tool here.** The subproblem space is `(m+1)(n+1)` — polynomial in input size. The same subproblems are referenced many times in a naive recursive formulation. The recurrence is local — each cell depends only on three neighbors. The optimal substructure is provable — an optimal alignment of `A[1..m]` to `B[1..n]` either matches the last characters, deletes `A[m]`, or inserts `B[n]`, and the rest of the alignment is optimal for the corresponding smaller subproblem.
+**2D recurrence over two sequences.** The subproblem is defined over a pair of indices, one from each sequence. Longest common subsequence and edit distance are both this pattern. The table is filled row by row.
 
-A greedy algorithm fails on edit distance: the locally optimal edit at one position can force suboptimal edits elsewhere. A D&C algorithm is wasteful: subproblems overlap heavily and would be recomputed. DP is the matched tool.
+**2D recurrence over an interval.** The subproblem is defined over a contiguous subarray `[i, j]`, and the recurrence considers all splits of that interval. Matrix chain multiplication — given a sequence of matrices, find the parenthesization that minimizes scalar multiplications — is this pattern. The table is filled by increasing interval length.
 
-## Failure modes — when DP is not the answer
+**0/1 knapsack.** Pick a subset of items to maximize value subject to a weight constraint. The subproblem is `OPT(i, w)` — optimal value from items `1..i` with remaining capacity `w`. The recurrence either includes item `i` (reducing capacity by `w_i`) or excludes it. Time `O(nW)` where `W` is the capacity — pseudo-polynomial, meaning it's polynomial in the numeric value of `W` but exponential in the bit representation. For `W = 10⁹` this is impractical; for `W = 10⁴` it's instant.
 
-The misconception engaged here continues from Chapter 6: "DP is the rigorous one; greedy is sloppy."
+**Bitmask DP over subsets.** When the subproblem is defined over a subset of a small set of elements, and the set is small enough that subsets can be represented as bitmasks, DP over subsets is feasible. The Held-Karp algorithm for TSP runs in `O(n² · 2ⁿ)` — exponential, but vastly better than the `O(n!)` brute force, and exact for `n` up to about 20 to 25.
 
-DP is not the universal optimization hammer. Three concrete failures.
+**Graph DP: Bellman-Ford and Floyd-Warshall.** Bellman-Ford computes single-source shortest paths with possible negative edges by iterating over `(vertex, iteration)` pairs — the subproblem is "shortest path to vertex `v` using at most `k` edges." Floyd-Warshall computes all-pairs shortest paths via `OPT(i, j, k)` — shortest path from `i` to `j` using only intermediate vertices from the set `{1, ..., k}`. Chapter 5 covers both in the context of graph algorithms; the DP framing is what makes them correct on negative-weight graphs.
 
-**Greedy would have worked, and would have been faster.** Interval scheduling, Huffman coding, MST, and fractional knapsack all admit provably optimal greedy algorithms. Forcing DP onto these problems is over-engineering. The exchange argument is a rigorous proof; greedy is a rigorous algorithm; together they are correct and cheaper.
+<!-- → [TABLE: DP pattern catalog — rows: 1D sequence, 2D two-sequence, 2D interval, 0/1 knapsack, bitmask subsets, graph DP; columns: subproblem definition form, table shape, fill order, canonical example, time complexity; student should be able to match an unfamiliar problem to its pattern by reading down the "subproblem definition form" column] -->
 
-**Subproblem space exponential.** TSP with `n = 100` has too many subset states even for bitmask DP. DP is the wrong tool; the right tools are exact-exponential algorithms (Chapter 10), approximation (Chapter 11), or heuristics. The Held-Karp DP earns its place at moderate `n`; beyond that, it fails.
+---
 
-**Pseudo-polynomial bound looks polynomial.** Knapsack with `n = 100` items and `W = 10⁹` is `O(nW) = 10¹¹` — exponential in the bit length of `W`. The same knapsack with `W = 10⁴` is `O(nW) = 10⁶` — instant. The pseudo-polynomial nature means the algorithm's practicality depends on the magnitude of numeric inputs, not just their count.
+## When DP Is Not the Answer
 
-**Top-down memoization without an iteration limit.** Naive memoization in a language with recursion-depth limits (Python defaults to 1000) blows up on long chains. Increase the limit, switch to iterative bottom-up, or use a manual stack.
+Dynamic programming is not the universal optimization tool. Three concrete ways it fails — and what to use instead.
 
-**Subproblem definition wrong.** The most common DP bug is a recurrence that solves the wrong problem. "Maximum value of items in a knapsack of capacity `w`, considering items 1 through `i`" is a working definition. "Best value at this step" is not — it does not name the state space. When a DP solution is mysteriously wrong, the subproblem definition is usually the place to look.
+**Greedy would have worked.** Interval scheduling, Huffman coding, minimum spanning trees, and the fractional knapsack all admit provably optimal greedy algorithms. The exchange argument is rigorous; greedy is not a sloppy shortcut. Forcing DP onto these problems buys you an extra `O(n)` or `O(n²)` factor for no benefit. Chapter 6 shows how to recognize when greedy is provably optimal.
 
-**Off-by-one in base cases.** The empty-input base cases (`OPT(0)`, `OPT(0, j)`, `OPT(i, 0)`) are where most subtle bugs live. Test against small hand-computed examples before scaling.
+**Subproblem space exponential, no compression.** TSP with 100 cities has too many subset states for bitmask DP. The right tools at that scale are exact-exponential algorithms (Chapter 10), approximation algorithms (Chapter 11), or heuristics. The bitmask DP earns its place up to `n ≈ 25`; past that, something else takes over.
 
-The corrective heuristic: state the subproblem precisely, write the recurrence, identify the base case, and verify on a small example. If the subproblem space is polynomial, DP works. If it is exponential and not bitmask-compressible, switch tools.
+**Pseudo-polynomial bounds that look polynomial.** Knapsack with `n = 100` items and capacity `W = 10⁹` runs in `O(nW) = 10¹¹` operations — exponential in the bit length of `W`. The same algorithm with `W = 10⁴` runs in `10⁶` operations — instant. The word "polynomial" in "pseudo-polynomial" is doing work: the algorithm is polynomial in the numeric values of the inputs, which may themselves be exponentially large relative to the number of bits used to represent them.
 
-## Cross-references
+There is one more failure mode worth naming because it's the most common: a DP solution that computes wrong answers because the subproblem definition is imprecise. "The best value at step `i`" is not a subproblem definition — it doesn't identify the state. "The maximum total value achievable from items `1` through `i` in a knapsack with remaining capacity `w`" is. When a DP is mysteriously wrong, the subproblem definition is almost always where the bug lives. Make it precise, make it testable, verify it on small cases by hand.
 
-For the contrast with D&C (independent subproblems), see Chapter 7. For the contrast with greedy (matroid + exchange argument), see Chapter 6. For Bellman-Ford and Floyd-Warshall as graph DP, see Chapter 5 §5. For DP-based approximation algorithms (FPTAS for knapsack, etc.), see Chapter 11 §3. For randomized DP variants, see Chapter 12.
+---
 
-## Companion-page handoffs
+## What You Can Now Do
 
-Extended DP problem catalog with implementations; visualizations of DP table evolution for edit distance, LCS, and matrix-chain; recursion refresher; Hirschberg's algorithm walkthrough; bitmask DP tutorials; comparison harness — DP vs greedy vs D&C — on benchmark problems. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-8.
+You can recognize when a problem has the two properties — optimal substructure and overlapping subproblems — that make dynamic programming applicable. You can define a subproblem precisely, write a recurrence, identify base cases, and choose between top-down memoization and bottom-up tabulation. You can apply space optimization when the full table is too large. You can recognize the canonical patterns — 1D sequence, 2D sequence, interval, knapsack, bitmask subsets, graph DP — and know when each applies. And you can recognize when greedy or divide-and-conquer is the right tool instead, and reach for it.
 
-## What this chapter does not enable
+The technique has a reach that extends far beyond the problems in this chapter. The defining question is always the same: does the problem have optimal substructure? And does the naive recursion recompute the same subproblems? When both answers are yes, write the recurrence. The rest is filling in a table.
 
-This chapter does not give a procedure for solving every optimization problem with DP. The diagnostic move — does the problem have optimal substructure and overlapping subproblems? — is craft skill that develops with practice. The chapter also does not cover advanced DP topics — Knuth-Yao optimization, divide-and-conquer DP optimization, convex hull trick, Aliens trick — which live in competitive-programming literature. Stochastic DP (Bellman equations on Markov decision processes) is a different mathematical framework and lives in Vol. 2.
+Chapter 9 applies this to network flow — where the maximum flow through a network is found by a sequence of augmentations, each exploiting optimal substructure over the residual graph. Chapter 11 shows how DP recurrences can be adapted to produce approximation algorithms, including the FPTAS for knapsack, when the exact DP is too slow.
 
-## Capability statement
+---
 
-You can now formulate a DP recurrence given a problem with optimal substructure and overlapping subproblems, choose between top-down memoization and bottom-up tabulation, apply space optimization when the table is the constraint, recognize the canonical DP catalog, and avoid the failure modes that come from forcing DP where greedy or D&C would suffice. The next time a problem looks like it might have repeating subproblems, the path to a working algorithm is in your hands.
+## Exercises
 
+### Warm-Up
+
+**1.** For each of the following problems, state whether it has (a) optimal substructure, (b) overlapping subproblems, both, or neither. For any that have both, briefly explain why. For any that have only one, explain why the other is absent and name the algorithm paradigm that fits instead.
+
+- Computing the `n`th Fibonacci number
+- Sorting an array using merge sort
+- Finding the shortest path in a weighted graph with non-negative edges
+- Determining whether a string is a palindrome
+- Counting all possible ways to tile a 2×n board with 1×2 dominoes
+
+*Tests: recognizing the two DP signals; distinguishing DP from D&C and greedy at the recognition stage.*
+
+**2.** A friend implements the following recurrence for the 0/1 knapsack problem: "the best value I can get from the remaining items." Their implementation passes small test cases but gives wrong answers on larger ones.
+
+(a) What is wrong with the subproblem definition?
+
+(b) Write a precise subproblem definition that correctly captures the state space. What are the two dimensions of state, and why are both necessary?
+
+(c) Write the base cases for your corrected definition.
+
+*Tests: diagnosing an imprecise subproblem definition; identifying the state space; establishing base cases.*
+
+**3.** Fill in the edit distance table for the strings `A = "cat"` and `B = "cart"` by hand (a 4×5 grid). Show every cell's value and the three arrows (from left, above, and diagonally above-left) that could have produced it. Trace the optimal path from the bottom-right corner back to the top-left and name each operation in the alignment.
+
+*Tests: executing the edit distance recurrence manually; reading a traceback path; naming edit operations.*
+
+---
+
+### Application
+
+**4.** Consider the weighted interval scheduling problem: you have `n` intervals, each with a start time, finish time, and value. You want to select a non-overlapping subset with maximum total value. This reduces to a 1D DP.
+
+(a) Sort the intervals by finish time. Define the subproblem `OPT(i)` precisely.
+
+(b) Write the recurrence. The key step is: for each interval `i`, you either include it (gaining its value plus the best solution on all intervals compatible with `i`) or exclude it (inheriting the best solution through interval `i-1`). How do you find "the last interval compatible with `i`" efficiently?
+
+(c) What is the time complexity of the full solution, including the preprocessing?
+
+*Tests: reducing a scheduling problem to a 1D DP recurrence; designing the recurrence with a binary search sub-step; reasoning about time complexity.*
+
+**5.** The space-optimized edit distance (two alternating rows) computes the edit distance but cannot recover the alignment. Explain Hirschberg's insight: why can the alignment be recovered using only `O(m + n)` space if you're willing to do `O(mn)` total work spread across a divide-and-conquer structure?
+
+Your answer should describe (a) what the forward pass computes, (b) what the backward pass computes, (c) how the midpoint of the optimal alignment is identified from the two passes, and (d) why this recurses correctly to give the full alignment.
+
+*Tests: reasoning about the space-time tradeoff for traceback; understanding Hirschberg's divide-and-conquer combination with DP.*
+
+**6.** Knapsack with `n = 50` items and capacity `W = 10⁶`. Your colleague says: "DP gives `O(nW) = 5 × 10⁷` operations — that's fine, we should just run it."
+
+(a) Compute the actual memory required if each table cell is a 64-bit integer. Is this feasible on a machine with 8 GB RAM?
+
+(b) Now suppose `W = 10⁹`. Recompute. What is the correct characterization of the algorithm's complexity that explains this failure?
+
+(c) Suggest two alternative approaches for the `W = 10⁹` case: one exact (for what range of `n` does it apply?) and one approximate (name the technique and its guarantee).
+
+*Tests: applying the pseudo-polynomial analysis; memory calculation; knowing when to switch from exact DP to approximation.*
+
+---
+
+### Synthesis
+
+**7.** You are given a sequence of matrix dimensions, and you want to find the parenthesization that minimizes the total number of scalar multiplications to compute the product. This is the matrix chain multiplication problem.
+
+(a) Define the subproblem `OPT(i, j)` precisely. What does it represent, and what is its domain?
+
+(b) Write the recurrence. The key branching structure is over all possible split points `k` in the range `[i, j)`. What are the base cases?
+
+(c) In what order must the table be filled, and why? (Hint: think about what "subproblem size" means for an interval recurrence.)
+
+(d) Trace through the computation for the chain `[10, 30, 5, 60]` (four matrices with dimensions 10×30, 30×5, 5×60). What is the optimal cost and the optimal parenthesization?
+
+*Tests: designing a 2D interval recurrence; determining fill order; executing a small instance by hand; reading off the optimal solution.*
+
+**8.** Bellman-Ford and Floyd-Warshall are both shortest-path algorithms from Chapter 5. Restate both as DP recurrences explicitly.
+
+For Bellman-Ford: define the subproblem in terms of (vertex, number of edges allowed), write the recurrence, identify the base case, and explain why `|V|−1` iterations suffice.
+
+For Floyd-Warshall: define the subproblem in terms of (source, destination, set of allowed intermediate vertices), write the recurrence, identify the base cases, and explain how the algorithm's three-nested-loop structure corresponds to the DP table fill order.
+
+Then: explain how seeing both algorithms as DP reveals why they are correct on negative-weight edges when Dijkstra is not.
+
+*Tests: translating graph algorithms into DP recurrences; connecting Chapter 5 and Chapter 8; using DP framing to explain correctness.*
+
+---
+
+### Challenge
+
+**9.** The longest increasing subsequence (LIS) of a sequence is the longest subsequence in which each element is strictly greater than the previous one. For the sequence `[3, 1, 4, 1, 5, 9, 2, 6]`, the LIS has length 4 (one example: `[1, 4, 5, 9]`).
+
+(a) Define a DP subproblem and recurrence that solves LIS in `O(n²)`.
+
+(b) An `O(n log n)` solution exists using a patience sorting structure. Describe the key insight: what does the patience sort maintain, and how is binary search used to achieve the logarithmic factor?
+
+(c) LIS and LCS are both "longest subsequence" problems. Can LIS be reduced to LCS? If so, describe the reduction and analyze the resulting time complexity. Is it better or worse than the direct `O(n²)` DP?
+
+*Tests: designing a novel DP recurrence; understanding an algorithmic improvement from O(n²) to O(n log n); recognizing reductions between DP problems.*
+
+**10.** The edit distance recurrence as presented uses unit costs for insertion, deletion, and substitution. In DNA sequence alignment (Needleman-Wunsch), the substitution cost is not uniform — it is drawn from a scoring matrix that assigns different costs to different character substitutions (e.g., replacing adenine with guanine costs less than replacing adenine with cytosine, reflecting biological plausibility).
+
+(a) Modify the edit distance recurrence to accommodate a general substitution cost function `sub_cost(A[i], B[j])`. Does the modification affect the time or space complexity?
+
+(b) Smith-Waterman is the *local* alignment variant: instead of aligning the full strings, it finds the highest-scoring alignment of any substring of `A` against any substring of `B`. What modification to the recurrence and base cases achieves this? What does the change reveal about the relationship between global and local alignment as DP problems?
+
+(c) For sequences of length 10⁶ (a realistic genome length), even the `O(min(m,n))` space-optimized version requires `O(mn)` time — about `10¹²` operations. Real bioinformatics pipelines don't do this. What class of technique do they use instead, and what does that technique trade away for its speed?
+
+*Tests: extending a DP recurrence to handle non-uniform costs; understanding global vs. local alignment as DP variants; reasoning about the gap between theoretical algorithms and production bioinformatics.*
 
 ---
 
