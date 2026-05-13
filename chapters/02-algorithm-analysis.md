@@ -1,153 +1,275 @@
-# Algorithm Analysis
+# Chapter 2 — Algorithm Analysis
 
-## TL;DR
+*What it means to say one way of doing something is better than another.*
 
-Algorithm analysis is the practice of predicting how an algorithm's running time and memory grow as input grows. Reach for this chapter when you need to compare two candidate algorithms before benchmarking, justify a complexity claim in a code review, or diagnose why an `O(n log n)` solution is somehow slower than an `O(n²)` one in production. After consulting it, you can read asymptotic complexity off pseudo-code, apply the master theorem to standard recurrences, distinguish worst-case / average / amortized bounds, and recognize when those bounds mislead.
+---
 
-## When asymptotic analysis applies
+Here is a question that sounds simple until you sit with it: how do you know, before you run a program, whether it will finish in a second or a year?
 
-You have two algorithms that solve the same problem, or one algorithm and a question of whether it scales. The input size is variable: today it is a thousand records, next quarter it might be a billion. You want to predict behavior in the regime you have not yet measured.
+<!-- → [CHART: line chart showing wall-clock time vs. input size n for a concrete O(n) algorithm, e.g. linear scan on a list — student should see that doubling n roughly doubles time, grounding the proportionality intuition before the formal definition appears] -->
 
-The signal is *scale uncertainty*. If the input is small and bounded — fewer than a few hundred items, always — asymptotic analysis is overkill. The constant factors dominate. A linear scan is fine. If the input is fixed and you have a profiler, measurement beats prediction. Asymptotic analysis is the right tool when you cannot afford to measure every regime, and you need a defensible answer about how cost grows.
+Not roughly. Not "it seems fast." Actually know, with an argument you could defend, that this particular approach to the problem scales and that one doesn't.
 
-The second signal is *algorithm comparison*. You have two candidates and want to know, in advance, which one wins as `n` grows. Asymptotic notation gives you a vocabulary for that comparison that is independent of language, machine, and constant factors.
+This is what algorithm analysis is for. Not to give you a number — not to tell you "it will take 4.7 milliseconds" — but to give you a language for describing how cost *grows*. The distinction matters because growth is what breaks things. A program that takes four milliseconds on a thousand records and four years on a billion records is not a program with a performance problem. It is a program with a *scaling* problem, and no amount of hardware fixes it.
 
-The third signal is *recurrence*. Your algorithm is recursive, and you want to know its total cost without unrolling the recursion by hand. The master theorem (and its companions) turns recurrences into closed-form bounds.
+The language for talking about growth is called asymptotic notation. I want to explain what it actually means, because it is one of those things where the name — "Big O" — gets learned long before the concept does, and once the name is in your head, it's easy to stop thinking.
 
-A signal that asymptotic analysis is *not* the right tool: cache and memory-hierarchy effects dominating real-world performance. An `O(n log n)` algorithm that thrashes the cache can lose to an `O(n²)` algorithm that streams. Asymptotic analysis is the floor of the discussion in that regime, not the ceiling. §6 of this chapter handles that case explicitly.
+---
 
-## What you need to know first
+## The Thing You're Actually Measuring
 
-This chapter assumes you can read pseudo-code, follow a loop nest count, and tolerate light algebra. Logarithms are used freely. Recurrences are introduced in §4 and used in Chapters 7 and 8 — if recursion itself is rusty, the recursion refresher on the companion page is the warm-up. Amortized analysis cross-references Chapter 3, where the dynamic table example is fully worked.
+Start with a concrete situation. You have a list of names and you want to find one particular name in it. The simplest approach: start at the beginning, check each name, stop when you find it or run out of names.
 
-## Big O, Big Omega, Big Theta — the notation toolkit
+How long does that take? It depends on two things: where the name is in the list, and how long the list is.
 
-Three notations, three jobs. They are constantly conflated in casual conversation; the chapter uses them precisely.
+If you're lucky, the name is first. One check. If you're unlucky, it's last — or not there at all. `n` checks, where `n` is the length of the list.
 
-**Big O** describes an upper bound on growth. `T(n) = O(f(n))` means: there exist constants `c > 0` and `n₀` such that for all `n ≥ n₀`, `T(n) ≤ c · f(n)`. Read it as "no worse than `f(n)` up to constants." Big O is the most common notation in practice because the upper bound is what you usually care about — the worst the algorithm will ever do.
+Now suppose the list doubles. Instead of a thousand names, ten thousand. In the worst case, your unlucky search now takes ten times longer. The cost *grows proportionally* to the size of the input.
 
-**Big Omega (Ω)** describes a lower bound. `T(n) = Ω(f(n))` means there exist `c > 0` and `n₀` such that for all `n ≥ n₀`, `T(n) ≥ c · f(n)`. Read it as "no better than `f(n)` up to constants." Use it when you want to claim an algorithm cannot be faster than some bound — for example, a comparison sort cannot be faster than `Ω(n log n)` in the worst case.
+This is what `O(n)` means. Not "the algorithm takes `n` steps." It means: as the input grows, the cost grows *in proportion* to the input. Double the input, roughly double the cost. Multiply the input by a million, multiply the cost by a million. The `O` is a shorthand for "on the order of" — a class of growth, not a precise measurement.
 
-**Big Theta (Θ)** is a tight bound — both upper and lower. `T(n) = Θ(f(n))` means `T(n) = O(f(n))` and `T(n) = Ω(f(n))`. Use it when the cost matches the bound on both sides.
+The formal definition, which I'll give you because it's worth having, says: `T(n) = O(f(n))` if there exist constants `c > 0` and `n₀` such that for all `n ≥ n₀`, `T(n) ≤ c · f(n)`. What that says in plain English is: past some threshold input size, the cost is bounded above by `f(n)` up to a constant multiplier. The constant absorbs all the details we're choosing to ignore — how fast the machine is, what programming language you used, how the memory is laid out — and leaves behind only the shape of growth.
 
-The casual use of "O" to mean "Θ" is everywhere, including in serious texts. The convention in this book: when a bound is tight on both sides, the prose says "Θ" or "exactly"; when the upper bound is what is being claimed, "O" stands as written. The distinction matters when you read a textbook proof or a paper — `O(n log n)` for sorting is a *guarantee* an algorithm achieves; `Ω(n log n)` is a *limit* below which no comparison sort can go.
+The shape is what survives. Everything else is a detail.
 
-The standard growth rates, from cheapest to most expensive, are: `O(1)` constant, `O(log n)` logarithmic, `O(n)` linear, `O(n log n)` linearithmic, `O(n²)` quadratic, `O(n³)` cubic, `O(2ⁿ)` exponential, `O(n!)` factorial. The gap between linearithmic and quadratic is where most production trade-offs live; the gap between polynomial and exponential is where Chapter 10 (NP-Completeness) lives.
+<!-- → [INFOGRAPHIC: visual breakdown of the formal Big O definition — annotate T(n) ≤ c·f(n) for all n ≥ n₀ with callouts labeling each component: "c absorbs machine speed, language, memory layout"; "n₀ is the threshold past which the bound holds"; "f(n) is the shape that survives" — student should see exactly what the constants are hiding] -->
 
-## Recurrences and the master theorem
+---
 
-Recursive algorithms have running times described by recurrence relations. Solving the recurrence gives the closed-form bound.
+## Three Notations, Three Questions
 
-The canonical form is `T(n) = a·T(n/b) + f(n)`, where `a` is the number of recursive calls per level, `b` is the factor by which each call shrinks the input, and `f(n)` is the work done outside the recursive calls (combining results, dividing the input, etc.). Merge sort, for instance, makes two calls on halves and merges in linear time: `a = 2`, `b = 2`, `f(n) = n`.
+In practice you'll encounter three versions of this idea, and they answer three different questions.
 
-The **master theorem** classifies the solution into three cases, depending on how `f(n)` compares to `n^(log_b a)`:
+**Big O** answers: what's the worst the algorithm could do? It's an upper bound. "This will never be worse than `f(n)` up to constants." Most of the time, this is what you care about — the ceiling, not the floor. A system that's usually fast but occasionally catastrophic is a broken system.
 
-- Case 1: `f(n) = O(n^(log_b a − ε))` for some `ε > 0`. The recursive work dominates. `T(n) = Θ(n^(log_b a))`.
-- Case 2: `f(n) = Θ(n^(log_b a))`. The work is balanced across levels. `T(n) = Θ(n^(log_b a) · log n)`.
-- Case 3: `f(n) = Ω(n^(log_b a + ε))` for some `ε > 0`, plus a regularity condition on `f`. The combine work dominates. `T(n) = Θ(f(n))`.
+**Big Omega (Ω)** answers: what's the best it could possibly do? It's a lower bound. You use it when you want to make a claim like "no algorithm can solve this problem faster than `f(n)`." The most famous such claim: no comparison-based sorting algorithm can sort `n` items faster than `Ω(n log n)` in the worst case. It's not that no one has found a faster algorithm — it's that *no such algorithm can exist*, and the argument for why requires the Ω notation to even state.
 
-For merge sort: `n^(log_b a) = n^(log_2 2) = n`, and `f(n) = n`, so case 2 applies and `T(n) = Θ(n log n)`.
+**Big Theta (Θ)** answers: what does the algorithm *actually* cost, tightly? It's both an upper and lower bound — the cost matches `f(n)` on both sides up to constants. When you say merge sort runs in `Θ(n log n)`, you're saying the cost is exactly linearithmic in growth: not just "at most `n log n`" but "at least `n log n`" too. The bound is tight.
 
-Two alternatives when the master theorem does not fit. The **substitution method** guesses a bound and proves it by induction. The **recursion tree method** draws the tree of recursive calls, sums work per level, and totals across levels. The recursion tree is the most useful when the recurrence is irregular — for example, `T(n) = T(n/3) + T(2n/3) + n`, where the master theorem does not apply directly but a recursion tree shows total work per level is `Θ(n)` across `Θ(log n)` levels, giving `T(n) = Θ(n log n)`.
+In casual conversation — including, honestly, in textbooks — "O" often does the work of "Θ." People say "merge sort is `O(n log n)`" when they mean "Θ(n log n)." The distinction matters when precision matters: an `O(n log n)` claim guarantees an upper bound; a `Θ(n log n)` claim says the algorithm actually achieves that and can't do fundamentally better.
 
-A master theorem reference card lives on the companion page. Use it.
+I'll try to use them precisely, and flag when I'm simplifying.
 
-## Worst-case, average, and amortized
+<!-- → [TABLE: three-column reference — notation (O, Ω, Θ), question it answers, when to reach for it — e.g. Ω row: "lower bound", "proving no algorithm can do better", "comparison-sort floor argument" — student should be able to pick the right notation for a given claim] -->
 
-A complexity bound is meaningful only if you specify *over what*. Three common framings:
+---
 
-**Worst-case** is the maximum cost over all inputs of size `n`. It is the bound a hostile adversary would force. Most textbook bounds — `O(n²)` for insertion sort, `O(n log n)` for merge sort — are worst-case unless otherwise marked. Worst-case is the right framing for systems where adversarial input is possible (a public web service, a parser exposed to attackers, anything where the input is not under your control).
+## The Standard Growth Rates
 
-**Average-case** is the expected cost over a probability distribution of inputs. Quicksort's `O(n log n)` is an average-case bound assuming random pivots and a uniform distribution of inputs; its worst-case is `O(n²)`. Average-case bounds are useful when the distribution assumption is realistic (or when you can enforce it — randomized quicksort, Chapter 12, makes the assumption true by randomizing the algorithm).
+There is a hierarchy of growth rates you should internalize, because they tell you immediately whether you're in a good situation or a bad one.
 
-**Amortized** is the average cost over a sequence of operations on a data structure, in the worst case. The dynamic array — a list that doubles its underlying buffer when it runs out of space — has `O(n)` worst-case cost on a single append (the resize) but `O(1)` amortized cost per append over `n` appends, because the resize cost is paid down by the cheap appends that follow it. Three methods exist for proving amortized bounds: the aggregate method (sum total cost, divide by `n`), the accounting method (charge each operation a fixed cost, save the surplus for later), and the potential method (define a potential function whose change funds expensive operations). Chapter 3 carries the dynamic table case study in full.
+From cheapest to most expensive:
 
-These framings are not interchangeable. A bound stated without specifying the framing is incomplete.
+`O(1)` — constant. The cost doesn't grow with input at all. Fetching an element from an array by index. A hash table lookup (on average). Whatever `n` is, the cost is roughly the same.
 
-## Cache effects — when asymptotic analysis lies
+`O(log n)` — logarithmic. Binary search on a sorted array. Each step cuts the remaining problem in half, so the total number of steps is the number of times you can halve `n` before reaching 1 — which is `log₂ n`. If `n` is a billion, `log₂ n` is about 30. Thirty comparisons to find an element in a billion-element sorted list. This is why binary search feels almost magical the first time you really understand it.
 
-Modern CPUs have a memory hierarchy: registers (sub-nanosecond), L1 cache (about 1 ns, ~32–64 KB), L2 (about 4 ns, hundreds of KB), L3 (about 12–40 ns, tens of MB), main memory (about 100 ns), SSD (microseconds), HDD (milliseconds). [verify] specific latency numbers for the chapter's intended publication year — these vary by architecture and improve over time.
+`O(n)` — linear. The linear scan above. Reading every element in a list. Growth is direct and proportional.
 
-The latency ratio between L1 and main memory is on the order of 100×. A program that hits L1 for every memory access runs roughly 100× faster than one that misses to main memory for every access, holding instruction count equal. Asymptotic analysis counts instructions and ignores this ratio. It is the floor of performance reasoning, not the ceiling.
+`O(n log n)` — linearithmic. Merge sort. Quicksort (on average). The comparison-sort lower bound sits here. Most of what you reach for in practice when you need to sort lives in this class.
 
-Three practical consequences.
+`O(n²)` — quadratic. Two nested loops, each running over `n` elements. Insertion sort in the worst case. Naive string matching. The gap between `O(n log n)` and `O(n²)` is where most of the consequential production trade-offs live — an `O(n²)` algorithm that's fast enough at ten thousand records will not be fast enough at a million.
 
-**Locality matters more than instruction count at small `n`.** Insertion sort runs in `O(n²)` worst-case, merge sort in `O(n log n)`. By instruction count, merge sort wins beyond a tiny `n`. By wall-clock time, insertion sort wins up to roughly `n = 32` to `n = 64`, depending on the implementation and machine, because it operates on a contiguous slice that fits in L1 cache, performs no recursive allocation, and the inner loop is a tight register operation. Production sort libraries — Python's Timsort, Java's Dual-Pivot Quicksort, the C++ standard library's introsort — all delegate small subarrays to insertion sort for this reason. The crossover point is the worked example below.
+`O(2ⁿ)` and `O(n!)` — exponential and factorial. These describe algorithms that enumerate all possible combinations or permutations of the input. They are essentially off the table for any non-trivial `n`. Chapter 10 covers why certain problems seem to force you into this territory and what you can do about it.
 
-**Pointer-chasing data structures pay a cache penalty asymptotic analysis hides.** A linked list and a dynamic array both support `O(1)` append. The array, in practice, is several times faster for almost all workloads because its elements are contiguous and prefetched. The linked list pays a cache miss per node traversal. CLRS and most textbook treatments do not mention this; the asymptotic bound is identical, the constant is not.
+<!-- → [CHART: log-scale plot of all seven growth classes from O(1) to O(n!) evaluated at n = 1 through n = 30 — student should see that the curves are indistinguishable at small n and diverge catastrophically past n = 20; this is the visceral argument for why growth class matters more than constants at scale] -->
 
-**Algorithm choice should account for the working set.** A hash table with `O(1)` expected lookup is faster than a balanced tree's `O(log n)` lookup at small `n`, but if the hash table is sized so its buckets do not fit in L2 and the tree's nodes do, the tree wins on cache locality. The misconception "`O(n log n)` is always good enough" — engaged in §10 — is a special case of this: asymptotic analysis describes a regime, not a conclusion.
+---
 
-The chapter's claim is not that asymptotic analysis is wrong. It is that asymptotic analysis is necessary but not sufficient. You use it to narrow the field; you measure to pick the winner.
+## What Recursion Costs
 
-## Decision rules
+A recursive algorithm's running time is described by a *recurrence* — an equation where the cost at size `n` is defined in terms of the cost at smaller sizes. To know the total cost, you solve the recurrence.
 
-| You are asking | Use |
-| --- | --- |
-| Worst-case upper bound on running time | Big O |
-| Lower bound — provably cannot be faster | Big Omega |
-| Tight bound, upper and lower match | Big Theta |
-| Recursive algorithm, standard form `T(n) = aT(n/b) + f(n)` | Master theorem |
-| Recursive algorithm, irregular split | Recursion tree |
-| Sequence of operations on a data structure | Amortized analysis |
-| Algorithm exposed to adversarial input | Worst-case bound |
-| Algorithm operating on randomized inputs or with internal randomness | Average-case |
-| Performance disagrees with the asymptotic prediction at production scale | Profile, then re-read §6 |
+The canonical form is:
 
-## Worked example — insertion sort vs merge sort crossover
+$$T(n) = a \cdot T\!\left(\frac{n}{b}\right) + f(n)$$
 
-Two algorithms. Insertion sort: walk left-to-right, inserting each element into the sorted prefix on its left. Time `Θ(n²)` worst-case, `Θ(n)` best-case (already-sorted input). Merge sort: divide the array in half, recursively sort each half, merge. Time `Θ(n log n)` worst-case and best-case.
+where `a` is the number of recursive subproblems at each level, `b` is the factor by which each subproblem shrinks the input, and `f(n)` is the work done outside the recursive calls — dividing the input, combining the results.
 
-By the bounds, merge sort wins for `n ≥ 2`. By the wall clock, insertion sort wins up to roughly `n = 32` on most modern hardware. [verify] specific cutoff per implementation; CPython's `list.sort()` uses 32 as the run threshold, the JDK's `Arrays.sort()` for primitive arrays uses around 47 [verify], the GNU libstdc++ `std::sort` uses 16 [verify].
+Merge sort, to make this concrete: you make two recursive calls (`a = 2`), each on half the input (`b = 2`), and the merge step takes linear time (`f(n) = n`). So `T(n) = 2T(n/2) + n`.
 
-Why does insertion sort win at small `n`? Three reasons.
+To solve this recurrence without unrolling it by hand, there's a theorem — the *master theorem* — that classifies the solution into three cases based on how `f(n)` compares to `n^(log_b a)`. Think of `n^(log_b a)` as the cost that would come from the recursive calls alone if the subproblems dominated; `f(n)` is the cost from the combining work.
 
-First, the constants. A merge sort iteration involves a recursive call (stack frame setup, return), a buffer allocation (or use of a scratch buffer), and a merge step that touches each element of both halves. An insertion sort iteration is a comparison and a possible shift in a register-resident loop. The per-element constant for insertion sort is several times smaller.
+**Case 1:** The recursive work dominates — `f(n)` grows slower than `n^(log_b a)`. The total cost is `Θ(n^(log_b a))`.
 
-Second, cache behavior. A 32-element subarray of 8-byte integers is 256 bytes — a few cache lines, easily resident in L1. Insertion sort streams through that contiguous block. Merge sort, even on the same block, allocates or addresses a scratch buffer and shuffles between two regions, doubling the working set.
+**Case 2:** The work is balanced — `f(n)` grows at the same rate as `n^(log_b a)`. The total cost picks up a logarithmic factor: `Θ(n^(log_b a) · log n)`.
 
-Third, branch prediction. Insertion sort's inner loop is a tight conditional with high predictability on partially-sorted data. Modern branch predictors hit close to 100% on its dominant branches. Merge's branch on which side to take an element from is harder to predict.
+**Case 3:** The combining work dominates — `f(n)` grows faster than `n^(log_b a)` (with a regularity condition I'll spare you). The total cost is `Θ(f(n))`.
 
-The crossover point is determined empirically by each library's authors and frozen as a constant. CPython's Timsort, for instance, calls binary insertion sort on runs shorter than its `MIN_RUN` constant (typically 32 to 64, computed from input length to balance run count) [verify]. The JDK's `Arrays.sort()` for primitives switches to insertion sort below `INSERTION_SORT_THRESHOLD = 47` in the Dual-Pivot Quicksort implementation [verify]. Introsort in libstdc++ inserts below 16 [verify].
+For merge sort: `n^(log₂ 2) = n^1 = n`, and `f(n) = n`, so we're in Case 2. Total cost: `Θ(n log n)`. The theorem delivers the answer in three lines that would otherwise take a page of induction.
 
-The asymptotic bound told you merge sort would win. At production scale on lists of millions, it does. At the recursion's leaf — subarrays of size 32 — insertion sort is faster, and every production sort library knows this.
+A reference card with the master theorem applied to the standard recurrences is on the companion page. The more important thing to understand is the structure of the reasoning: you're asking whether the cost comes from the leaves of the recursion tree (Case 1), from every level equally (Case 2), or from the top (Case 3). The master theorem is just a formula for that question.
 
-The lesson: the bound is the field of comparison, not the conclusion. Real implementations are hybrids that respect both the asymptotic bound (at large `n`) and the constants (at small `n`).
+When the master theorem doesn't apply — when the split is unequal, or the recurrence is irregular — the *recursion tree method* is your fallback. Draw the tree. Label the work at each level. Sum across levels. For instance, the recurrence `T(n) = T(n/3) + T(2n/3) + n` has unequal splits, so the master theorem doesn't fit directly. But the recursion tree shows that each level sums to `n` (even though the tree is unbalanced), and the tree has `O(log n)` levels, so the total is `Θ(n log n)`.
 
-## Failure modes — when asymptotic analysis misleads
+<!-- → [IMAGE: recursion tree for T(n) = T(n/3) + T(2n/3) + n — show the unbalanced tree with level-by-level work labeled; annotate that each level still sums to n despite the imbalance; label the depth as O(log n) — student should see why an irregular split doesn't change the answer here and understand the recursion tree method as a visual proof technique] -->
 
-The misconception this chapter engages: "`O(n log n)` is always good enough." It is not.
+---
 
-`O(n log n)` is always good enough *as an asymptotic bound* when you are sorting unstructured input at scale. It is wrong as a substitute for thinking about constants and cache effects.
+## Three Ways to Frame the Same Algorithm
 
-Three concrete failure modes.
+A complexity bound without a framing is an incomplete statement. The framing specifies what set of inputs you're taking the cost over.
 
-**Cache-oblivious bounds beating cache-friendly bounds in practice.** A radix sort runs in `O(n)` for fixed-width keys but pays a cache penalty per pass over the data and is often slower than a well-tuned `O(n log n)` quicksort on real-world string data, especially when keys are short and number of distinct values is large. The bound predicts radix wins; the cache says otherwise. Measure.
+**Worst-case** is the maximum cost over all inputs of size `n` — the cost when an adversary picks your input. Most textbook bounds are worst-case unless otherwise marked. Insertion sort's worst case is `Θ(n²)` — achieved when the input is sorted in reverse. Merge sort's worst case is `Θ(n log n)` — and so is its best case.
 
-**Hidden constants from data structure overhead.** A balanced binary search tree gives `O(log n)` lookup. A hash table gives `O(1)` expected lookup. The hash table seems to dominate. But for `n` smaller than a few thousand, the tree's contiguous memory layout and lower memory overhead can beat the hash table's allocation and pointer-chasing. The bound says hash table; the constants say "depends on `n`." The engagement of this misconception is in §6 above.
+**Average-case** is the expected cost over a probability distribution on inputs. Quicksort's average-case running time, assuming random inputs (or a randomized pivot selection), is `O(n log n)`. Its worst case is `O(n²)` — achieved when the pivot is always chosen badly. The distinction matters: in the average case, quicksort is as good as merge sort and usually faster in practice due to smaller constants and better cache behavior. In the worst case, it's catastrophically slow on sorted input, which is one of the most common real-world inputs.
 
-**Worst-case framing where average-case is the real workload.** Quicksort is `O(n²)` worst-case, `O(n log n)` average. Used naively, an adversarial input — already sorted, with first element as pivot — degrades to `O(n²)`. Used with random pivots, the worst-case is essentially never hit. Stating "quicksort is `O(n²)`" is true and misleading; "randomized quicksort has expected running time `O(n log n)` and `O(n²)` worst-case with vanishing probability" is the honest framing. Chapter 12 carries this fully.
+**Amortized** is the average cost per operation over a *sequence* of operations in the worst case — not "what's the average input" but "what's the average cost across many operations on the same data structure."
 
-**Average-case framing where worst-case is the real workload.** Hash tables have `O(1)` expected lookup. Used in a public web service, an adversary can craft inputs that all hash to the same bucket and force `O(n)` per lookup — the algorithmic complexity attack. Stating "hash table is `O(1)`" is true and dangerous when the bound being violated is the one that matters.
+The canonical example is the dynamic array — a list that doubles its underlying buffer when it runs out of space. A single append that triggers a resize is `O(n)` — it copies all `n` existing elements. But how often does resizing happen? If you start with a buffer of size 1 and keep doubling, resizing happens at sizes 1, 2, 4, 8, ..., n. The total cost of all resizes across `n` appends is `1 + 2 + 4 + ... + n = 2n`, which is `O(n)`. Spread over `n` appends, that's `O(1)` per append, *amortized*. 
 
-The corrective heuristic: state the bound, state the framing (worst-case / average / amortized), and state the regime of `n` where the bound dominates the constants. A complete complexity claim has all three.
+The expensive operation is real. But you pay for it in installments across the cheap operations that follow, and the average works out to constant time.
 
-## Cross-references
+<!-- → [CHART: bar chart showing per-operation cost of n append operations on a dynamic array — x-axis is operation number 1..n, y-axis is cost; cheap O(1) appends appear as short bars, resize events appear as tall spikes at powers of 2; amortized cost shown as a flat horizontal line at O(1) — student should see visually that the spikes are real but infrequent enough that the average stays constant] -->
 
-For the master theorem applied to specific divide-and-conquer algorithms, see Chapter 7. For amortized analysis worked through dynamic tables, hashing, and Fibonacci heaps, see Chapter 3. For cache effects in sorting and replacement algorithms, see Chapter 4. For randomized analysis as a complexity framing, see Chapter 12. For NP-hardness as a different complexity claim entirely, see Chapter 10.
+Three methods exist for proving amortized bounds more carefully: the *aggregate method* (total the cost, divide by operations), the *accounting method* (charge each operation a fixed amortized cost and save the surplus for later), and the *potential method* (define a potential function that acts like a "stored energy" in the data structure, funding expensive operations from the energy accumulated during cheap ones). Chapter 3 works through all three on the dynamic table.
 
-## Companion-page handoffs
+---
 
-Extended Python and C++ implementations of the algorithms benchmarked above, plus a profiler-driven crossover-finding harness, master theorem reference card, and a visualization gallery showing growth-rate curves at practitioner-relevant scales (`n = 10^3`, `10^6`, `10^9`), are available on the companion page at bearbrown.co/algorithms-by-bear-vol1/chapter-2.
+## When the Analysis Lies
 
-## What this chapter does not enable
+Modern computers have a memory hierarchy. Registers, sitting inside the processor, are sub-nanosecond. L1 cache — a small, fast memory a centimeter from the computation — is roughly a nanosecond. L2, a few nanoseconds. L3, ten to forty nanoseconds. Main memory, a hundred nanoseconds. An SSD, microseconds. A hard drive, milliseconds.
 
-This chapter does not enable you to derive tight lower bounds for arbitrary problems. Lower-bound proofs — adversary arguments, decision-tree models, communication complexity — are graduate-level machinery; for that level of treatment, consult CLRS Chapter 8 or *Computational Complexity: A Modern Approach* by Arora and Barak. This chapter also does not cover smoothed analysis, parameterized complexity, or fine-grained complexity. Those are research frontiers; pointers live on the companion page.
+The ratio between L1 and main memory is roughly 100:1 in latency. A program that hits L1 for every access runs about a hundred times faster than a program that misses to main memory on every access, holding instruction count constant.
 
-## Capability statement
+<!-- → [TABLE: memory hierarchy reference — columns: level, approximate latency, approximate size; rows: registers, L1 cache, L2 cache, L3 cache, main memory, SSD, HDD — student should internalize the 100× gap between L1 and main memory that makes cache behavior decisive at production scale] -->
 
-You can now read the asymptotic complexity off a piece of pseudo-code, compare two algorithms' complexities at scale, apply the master theorem to standard recurrences, distinguish worst-case / average-case / amortized framings, and diagnose when asymptotic analysis is misleading in practice. The next time a code review asks "what's the complexity of this," you have a defensible answer and the framing it requires.
+Asymptotic analysis counts instructions. It does not count cache misses.
 
+This is not a flaw — it's a deliberate choice, the right abstraction for its purpose. But it means the bound is not the whole story.
+
+Here is a concrete example. Insertion sort runs in `Θ(n²)` worst case. Merge sort runs in `Θ(n log n)` worst case. By instruction count, merge sort dominates past `n = 2`. By wall-clock time, on modern hardware, insertion sort wins up to roughly `n = 32` to `n = 64`, depending on the machine and implementation.
+
+Why? At `n = 32`, the elements fit in a few cache lines — a few hundred bytes — easily resident in L1. Insertion sort streams through a contiguous block of memory that's already in cache. Merge sort, even on the same thirty-two elements, does a recursive call (setting up a stack frame), addresses a scratch buffer for merging (potentially elsewhere in memory), and shuffles between two memory regions. The per-element constant for insertion sort is several times smaller, and at small `n`, that constant is all that matters.
+
+This is why every production sort library is a hybrid. Python's Timsort delegates to binary insertion sort on runs shorter than a threshold (typically 32 to 64 elements, computed from input length). The JDK's dual-pivot quicksort switches to insertion sort below a threshold around 47. GNU's `std::sort` inserts below 16. The asymptotic bound governs behavior at large `n`; the constants govern behavior at small `n`; the crossover point is found empirically and baked in as a constant.
+
+<!-- → [CHART: wall-clock time vs. n for insertion sort and merge sort on the same machine, n ranging from 1 to 200 — show the crossover point where merge sort's line dips below insertion sort's; annotate the crossover region with the library thresholds (16, 32–64, 47); student should see that the O(n²) algorithm genuinely wins at small n and understand why hybrid sorts exist] -->
+
+The misconception worth naming: "`O(n log n)` is always good enough." It is good enough as an asymptotic class when you're sorting unstructured input at scale. It is not a substitute for thinking. Three ways this goes wrong:
+
+First, a radix sort runs in `O(n)` for fixed-width integer keys. Faster asymptotically. But it pays a cache penalty on each of its passes over the data, and on real-world string keys with many distinct values, a well-tuned `O(n log n)` quicksort often wins in wall time. The bound says radix sort wins. The cache says measure.
+
+Second, a hash table offers `O(1)` expected lookup. A balanced binary search tree offers `O(log n)`. The hash table dominates asymptotically. But if the hash table is large enough that its buckets don't fit in cache, and the tree's nodes do, the tree wins on repeated lookups in a working set that fits in L2. The bound says hash table. The cache says "what's `n`, and what fits in cache?"
+
+Third, an algorithm stated with an average-case bound applied to a worst-case workload. Hash tables have `O(1)` expected lookup — expected over a random distribution of keys. Feed a public web service a hash table, and an adversary can craft inputs that all collide in the same bucket, forcing `O(n)` per lookup. This is the algorithmic complexity attack, and it's been used in practice. The bound is correct; the framing was wrong for the context.
+
+The corrective habit: state the bound, state the framing (worst-case, average-case, amortized), and note the regime of `n` where the bound governs. A complete complexity claim has all three.
+
+---
+
+## What to Reach For
+
+When you have two algorithms and want to compare them at scale, reach for Big O and compare growth classes. When you want to prove that no algorithm can do better than a certain rate, reach for Big Omega. When you need a tight bound, reach for Theta.
+
+When your algorithm is recursive and fits `T(n) = aT(n/b) + f(n)`, apply the master theorem. When the split is unequal or the recurrence is irregular, draw the recursion tree.
+
+When you need a worst-case guarantee for adversarial input, use worst-case analysis. When your algorithm has internal randomization or your input distribution is well-understood, use average-case analysis. When you're reasoning about a sequence of operations on a data structure, use amortized analysis.
+
+When the algorithm's empirical behavior disagrees with the asymptotic prediction — when the `O(n²)` algorithm is mysteriously faster than the `O(n log n)` one in production — profile, then re-read the cache effects section above.
+
+The analysis doesn't replace measurement. It narrows the field so measurement is worth doing.
+
+---
+
+## Where This Goes
+
+You can now read the asymptotic complexity off a piece of pseudocode, compare two algorithms' complexities at scale, apply the master theorem to standard recurrences, distinguish worst-case from average-case from amortized framings, and recognize when asymptotic analysis is being used to mislead rather than illuminate.
+
+That's the vocabulary. The next three chapters put it to work: Chapter 3 analyzes the canonical data structures from first principles and uses amortized analysis to justify claims that look wrong until you work them out. Chapter 7 applies the master theorem to divide-and-conquer algorithms beyond merge sort. Chapter 12 makes average-case analysis rigorous through randomization.
+
+The question we started with — how do you know, before running a program, whether it scales? — now has a partial answer: you describe the shape of its growth, you specify the conditions under which that description holds, and you stay honest about what the description doesn't tell you.
+
+---
+
+## Exercises
+
+### Warm-Up
+
+**1.** For each algorithm below, identify its growth class (O(1), O(log n), O(n), O(n log n), O(n²), or O(n³)) and state whether your answer is a worst-case, average-case, or amortized bound. Justify each answer in one sentence.
+
+- Looking up a value in a Python dictionary by key
+- Finding the minimum element in an unsorted list of `n` integers
+- Printing all pairs `(i, j)` where `0 ≤ i < j < n`
+- Binary search on a sorted array of `n` elements
+
+*Tests: reading growth class off an algorithm description; distinguishing notation framings.*
+
+**2.** The following are informal complexity claims. For each one, identify whether it uses Big O, Big Omega, or Big Theta — or whether the framing is ambiguous. Then rewrite it precisely using the correct notation.
+
+- "Merge sort takes `n log n` time."
+- "No comparison sort can do better than `n log n`."
+- "Bubble sort is about `n²`."
+
+*Tests: mapping informal language onto precise notation; distinguishing O, Ω, Θ.*
+
+**3.** A dynamic array starts empty. You perform 16 appends. Draw or describe the sequence of per-operation costs, marking which appends trigger a resize. What is the total cost of all 16 appends? What is the amortized cost per append?
+
+*Tests: applying the aggregate method for amortized analysis; the dynamic array case.*
+
+---
+
+### Application
+
+**4.** Apply the master theorem to each recurrence. State which case applies, show why, and give the asymptotic bound.
+
+- `T(n) = 4T(n/2) + n`
+- `T(n) = 2T(n/2) + n`
+- `T(n) = T(n/2) + n²`
+- `T(n) = 3T(n/3) + n log n`
+
+For the last one, determine whether the master theorem applies directly and explain your reasoning.
+
+*Tests: applying the master theorem; recognizing Case 1, 2, and 3; identifying when the theorem doesn't apply.*
+
+**5.** You have two implementations of a function that computes whether a list contains any duplicate values:
+
+- **Implementation A:** For each element, scan the rest of the list to check for a match. `O(n²)` worst-case.
+- **Implementation B:** Insert each element into a hash set; if insertion fails (element already present), return true. `O(n)` expected.
+
+(a) At what input size does Implementation B's advantage become decisive? At what input size might Implementation A still be competitive, and why?
+
+(b) Suppose this function is called on user-supplied input in a public web service. Explain why Implementation B's expected-case bound could be violated and what the consequence would be.
+
+*Tests: comparing algorithms across complexity classes; applying worst-case vs. average-case framing to a realistic security scenario.*
+
+**6.** A colleague claims: "I benchmarked my `O(n log n)` sort against a library's `O(n²)` sort on lists of 50 elements and mine was slower. Something must be wrong with my implementation."
+
+Explain to your colleague, precisely, what is actually happening. Your explanation should reference at least two distinct reasons why the `O(n²)` sort might win at `n = 50`, and what the claim "`O(n log n)` is always faster" misses.
+
+*Tests: applying cache effects and constant-factor reasoning; diagnosing the misconception that asymptotic class determines wall-clock winner.*
+
+---
+
+### Synthesis
+
+**7.** The recurrence `T(n) = T(n/3) + T(2n/3) + n` describes the cost of a divide-and-conquer algorithm that splits the input unevenly. The master theorem does not apply directly.
+
+(a) Use the recursion tree method to find `T(n)`. Show the work at each level of the tree, argue why each level sums to `n`, and state the depth of the tree.
+
+(b) What bound does this give? Is it tight (Θ) or just an upper bound (O)? Justify.
+
+*Tests: applying the recursion tree method to an irregular recurrence; constructing a Θ argument.*
+
+**8.** You are designing a key-value store that will handle up to 10 million records. Two candidate data structures are under consideration: a balanced binary search tree (O(log n) lookup, worst-case) and a hash table (O(1) lookup, expected).
+
+Write a structured recommendation that: (a) gives the asymptotic comparison, (b) identifies at least one scenario where the tree outperforms the hash table in practice despite the bound, and (c) names the framing condition under which the hash table's bound breaks. Your recommendation should read as a complete complexity claim — bound, framing, and regime.
+
+*Tests: synthesizing asymptotic notation, cache effects, and framing conditions into a practical engineering recommendation.*
+
+---
+
+### Challenge
+
+**9.** The algorithmic complexity attack described in the cache effects section exploits the gap between expected-case and worst-case bounds for hash tables. Research (or reason from first principles) how modern hash table implementations defend against this attack. What mechanism converts the vulnerability from a worst-case guarantee into a practical non-issue? What does the defended implementation trade off to achieve this?
+
+Your answer should name the specific technique, explain why it works in terms of the probability distribution on inputs, and state what cost it imposes.
+
+*Tests: connecting amortized and average-case reasoning to a real security design decision; reasoning about randomized algorithms and their probabilistic guarantees.*
+
+**10.** Smoothed analysis is a complexity framework introduced by Spielman and Teng in 2001 to explain why simplex — an algorithm with exponential worst-case complexity — performs so well in practice. Without looking it up (or after looking it up): explain in your own words what smoothed analysis measures that worst-case and average-case analysis don't. Why would an algorithm have polynomial smoothed complexity but exponential worst-case complexity? What does this say about the limits of worst-case analysis as a predictor of real-world performance?
+
+*Tests: reasoning about complexity frameworks beyond the chapter's scope; evaluating asymptotic analysis as a modeling choice with tradeoffs, not a ground truth.*
 
 ---
 
