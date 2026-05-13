@@ -1,110 +1,209 @@
-# Introduction to Algorithms
+# Chapter 1 — Introduction to Algorithms
 
-## TL;DR
+*The map before the territory.*
 
-*Algorithms by Bear, Vol. 1* is a Kindle-priced reference handbook covering the classical algorithms canon — analysis, data structures, sorting, graphs, greedy, divide-and-conquer, dynamic programming, network flow, NP-completeness, approximation, randomized algorithms, and linear programming. Reach for this book when you need to identify the right algorithm, recall a complexity bound, or recognize when a problem fits a canonical pattern. After consulting it, you can choose an algorithm, justify the choice, and route past the canonical failure modes.
+---
 
-## When this book applies
+There is a moment every engineer knows. You are staring at a problem that feels algorithmic — something about sorting, or searching, or finding the shortest path through a graph — and you cannot quite remember what the right tool is called, or you can name it but cannot remember what it actually does, or you know both things but want to confirm one complexity bound before you commit. The problem is real. The deadline is real. What you need is a fast answer, not a course.
 
-You are a working software engineer with a problem in front of you. You suspect there is a named algorithm or analysis technique for it, but you cannot remember which one, or you can name it but cannot remember what it actually does, or you can do both but want to confirm a complexity bound or a failure mode before you ship. This book is for those moments.
+This book is for that moment.
 
-The shape of the question matters. *Algorithms by Bear, Vol. 1* answers questions of the form: "Which sort do I use here?" "What does it cost?" "When does this break?" "Is this approach provably optimal or just usually good enough?" It does not answer "How do I implement a red-black tree in C++ from memory?" — your standard library or a textbook with full code listings does that. It does not answer "What is the gradient of attention with respect to query weights?" — the *Algorithms by Bear* magazine and a deep-learning textbook do that.
+It is not a textbook. It is not a theoretical reference. It is a handbook — the kind of book you open to a specific chapter because you have a specific problem, confirm what you need, and close. The chapters are designed for lookup. You are expected to skip around.
 
-If the question is decidable from a chapter's decision rules, this book is the right book. If the question requires implementation-ready code, consult the companion page. If the question concerns a method outside the classical canon — Bayesian decision theory, online learning, reinforcement learning, transformers — consult Vol. 2 or the magazine.
+But before you skip, read this chapter. Not because it teaches an algorithm — it teaches none — but because it tells you how the book is shaped, which chapter answers which kind of question, and when this book is the wrong book and something else is right. That orientation is fast, and skipping it costs more time than reading it.
 
-The book is not a course textbook and is not a theoretical CS reference. It is a handbook. The chapters are designed for lookup. You are expected to skip around. The sequential dependencies are marked.
+---
 
-## What you need to know first
+## What kind of question this book answers
 
-This book assumes you can read pseudo-code, can run a basic complexity argument, and have written software professionally. No formal algorithms course is assumed. If you have not read Chapter 2 (Algorithm Analysis) or Chapter 3 (Data Structures) yet, read them first. Every later chapter cites Big O, recurrences, heaps, and hash tables; those two chapters carry the vocabulary the rest of the book uses. The recursion refresher and probability primer live on the companion page.
+The question has to have a certain shape for this book to help.
+
+Here is the shape: you have a problem in front of you, you suspect there is a named algorithm or a known analysis technique that applies, and you want to identify it, recall what it does, confirm its cost, or recognize where it fails. Questions of the form: "Which sort do I use here?" "What does it cost to do this?" "When does this approach break?" "Is this provably optimal or just usually good enough?"
+
+That shape is what this book addresses.
+
+Here is a shape this book does not address: "How do I implement a red-black tree in C++ from scratch?" Your standard library does that for you in production, and a textbook with full code listings does it for learning. This book tells you when a balanced tree is the right data structure and what it costs — not how to build one from memory.
+
+Here is another shape this book does not address: "What is the gradient of attention with respect to the query weights?" That is a different book. The *Algorithms by Bear* magazine covers ML-era methods. Vol. 2 covers decision-making algorithms — Bayesian inference, optimal stopping, game theory. This volume covers the classical canon: analysis, data structures, sorting, graphs, greedy algorithms, divide-and-conquer, dynamic programming, network flow, NP-completeness, approximation, randomized algorithms, and linear programming. Thirteen chapters. Four clusters. One canon.
+
+The boundary matters. Every reference book has one. This one is drawn around the classical algorithms that appear in most software engineering work and almost every algorithms interview, stopping before the territory that belongs to other books.
+
+<!-- → [INFOGRAPHIC: two-region boundary map — "This Book" on the left listing the 13 canonical topics, "Elsewhere" on the right listing ML-era methods, decision theory, and implementation-ready code — visually reinforces the scope argument the prose makes here] -->
+
+---
+
+## What you need before you start
+
+Two chapters carry the vocabulary the rest of the book uses: Chapter 2 on algorithm analysis and Chapter 3 on data structures.
+
+Chapter 2 gives you Big O notation, recurrence relations, and the master theorem. These are not decoration. Every later chapter states its costs in terms of Big O, and several derive those costs through recurrences. If you open Chapter 8 on dynamic programming without having read Chapter 2, the recurrences will not parse. The fix is short — Chapter 2 is not long — but it is real.
+
+Chapter 3 gives you heaps, hash tables, and balanced trees. These three structures appear constantly in later chapters, sometimes as the central subject, more often as tools the algorithm uses. Chapter 5 on graphs uses priority queues — which are heaps. Chapter 6 on greedy algorithms uses heaps to extract minimum-cost edges. Chapter 8 on dynamic programming stores intermediate results in hash tables. If you do not know what a heap costs to insert into and extract the minimum from, the analyses in those chapters will feel arbitrary.
+
+So: read Chapter 2. Read Chapter 3. Then skip wherever you want.
+
+If you need a refresher on recursion or probability — two topics that come up in Chapters 7 and 12 specifically — those are on the companion page at bearbrown.co rather than in the book itself. The book keeps the probability primer off the main track because most readers do not need it until Chapter 12, and forcing them past it to get to Chapter 4 would be wrong.
+
+<!-- → [CHART: dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine, then Ch4–Ch13 branching off with their prerequisite arrows — reader sees at a glance which chapters depend on which before opening any of them] -->
+
+---
 
 ## How the book is shaped
 
-Thirteen chapters in four clusters.
+Thirteen chapters in four clusters. Here they are.
 
-**Foundations (Chapters 1–3).** Introduction. Algorithm Analysis. Data Structures. These chapters establish the vocabulary — Big O, master theorem, amortized analysis, heaps, hash tables, balanced trees, bloom filters — that the rest of the book uses without re-explaining.
+**Foundations.** Chapters 1 through 3. Introduction — this chapter. Algorithm Analysis. Data Structures. The vocabulary layer. Nothing in Chapters 4 through 13 re-explains Big O or re-introduces heaps. Read these first and you will not have to re-read them.
 
-**Core methods (Chapters 4–8).** Sorting and Caching. Graphs and Graph Search. Greedy. Divide and Conquer. Dynamic Programming. The five method families that solve most algorithmic problems a working engineer encounters.
+**Core methods.** Chapters 4 through 8. Sorting and Caching. Graphs and Graph Search. Greedy Algorithms. Divide and Conquer. Dynamic Programming. These five families solve most algorithmic problems a working engineer encounters. If your problem is not in here, it is probably in the optimization cluster or it is not a classical algorithms problem.
 
-**Optimization (Chapters 9–11, 13).** Network Flow. NP-Completeness and Intractability. Approximation Algorithms. Linear Programming. The methods you reach for when the problem looks combinatorial-hard or has the structure of a constraint system.
+**Optimization.** Chapters 9 through 11, plus Chapter 13. Network Flow. NP-Completeness and Intractability. Approximation Algorithms. Linear Programming. You reach for these when the problem is combinatorially hard — when you suspect there is no efficient exact algorithm — or when it has the structure of a system of constraints with an objective you want to maximize or minimize.
 
-**Probabilistic (Chapter 12).** Randomized Algorithms. Placed deliberately between optimization chapters: randomized methods are tools the optimization chapters reach for, and the probabilistic outlier deserves its own chapter rather than being scattered.
+**Probabilistic.** Chapter 12. Randomized Algorithms. One chapter, placed between the optimization chapters, because randomized methods are tools the optimization chapters reach for and the probabilistic perspective deserves its own treatment rather than being scattered across the book as footnotes.
 
-Linear Programming sits at Chapter 13 — last — as the capstone optimization method that closes threads opened in Chapters 6, 9, 10, and 11.
+Linear Programming is last — Chapter 13 — because it is the capstone. It closes threads that Chapters 6, 9, 10, and 11 leave open. By the time you arrive at it, you have enough context to see why it is powerful and what it subsumes.
 
-## How chapters are shaped
+<!-- → [INFOGRAPHIC: four-cluster architecture diagram — Foundations (Ch1–3), Core Methods (Ch4–8), Optimization (Ch9–11, 13), Probabilistic (Ch12) — rendered as labeled bands or columns, with Ch13 visually anchored as the capstone that bridges back to earlier clusters] -->
 
-Every chapter follows the same anatomy. TL;DR for orientation. A "When [method] applies" or "Recognition pattern" section: what does the problem look like that calls for this chapter? A pointer to prerequisites. Three to five sections covering the method. A "Decision rules" section — usually a table or short flowchart — for fast in-chapter lookup. One worked example drawn from a real practitioner domain, never a pedagogical hypothetical. A "Failure modes" section listing where this chapter's method goes wrong, including the named misconception the chapter engages. Cross-references to other chapters. Companion-page handoffs naming what extended material lives at bearbrown.co. An anti-capability paragraph naming what the chapter does *not* enable. A capability statement closing the chapter.
+---
 
-There are no exercises, no learning objectives, no chapter-opening hooks. This is a reference book.
+## How each chapter is shaped
+
+Every chapter follows the same anatomy. This is intentional. A reference book that is consistent is faster to use than one that is creative.
+
+Each chapter opens with a TL;DR — three to five sentences that state what the chapter covers, when the method applies, and what it costs. If you are in a hurry, the TL;DR tells you whether you are in the right chapter.
+
+Then comes a section called "When [method] applies" or "Recognition pattern" — what does the problem look like that calls for this chapter? This is the diagnostic section. It is what you read when you are not yet sure whether your problem fits here or somewhere else.
+
+Then a pointer to prerequisites. This is honest: if the chapter requires you to know something from an earlier chapter, it says so explicitly and tells you which one.
+
+Then three to five sections covering the method itself — what it is, how it works, why it costs what it costs, where the interesting engineering lives.
+
+Then a "Decision rules" section. Usually a table or a short flowchart. If the chapter covers multiple variants of a method — and many chapters do, because most methods come in several flavors — the decision rules tell you which variant fits which situation. This is the section you return to after you have read the chapter once and need to apply the method later.
+
+Then one worked example from a real practitioner domain. Not a pedagogical hypothetical. A real problem — the kind that appears in production systems or research code — worked through in enough detail to show the method actually running, not just described.
+
+Then a "Failure modes" section. Where does this method go wrong? What is the named misconception the chapter wants to prevent? Most chapters have one central failure mode — one thing engineers get wrong repeatedly — and the chapter names it directly.
+
+Then cross-references to other chapters, a handoff to the companion page for extended material, an anti-capability paragraph that names what the chapter does *not* enable, and a capability statement that closes the chapter by saying what you can now do.
+
+There are no exercises. No learning objectives written for a course. No chapter-opening hooks designed to create engagement. This is a reference book. The anatomy serves the reference function, not the pedagogy function.
+
+<!-- → [IMAGE: annotated anatomy of a single chapter page — a mock chapter spread with callout labels pointing to each section (TL;DR, Recognition pattern, Decision rules, Worked example, Failure modes) — shows the reader the consistent skeleton they will navigate in every chapter] -->
+
+---
+
+## Which chapter to consult
+
+When the diagnosis is clear, go directly to the chapter. When it is not, start at Chapter 2 or 3 and follow the cross-references.
+
+| You are asking | Start at |
+|---|---|
+| What does this cost? | Chapter 2 — Algorithm Analysis |
+| What structure should I use? | Chapter 3 — Data Structures |
+| Which sort? Which cache policy? | Chapter 4 — Sorting and Caching |
+| Shortest path? Connectivity? Search? | Chapter 5 — Graphs and Graph Search |
+| Is greedy provably optimal here? | Chapter 6 — Greedy Algorithms |
+| Self-similar subproblems? | Chapter 7 — Divide and Conquer |
+| Overlapping subproblems? | Chapter 8 — Dynamic Programming |
+| Bipartite matching? Min-cut segmentation? | Chapter 9 — Network Flow |
+| Suspect this is NP-hard? | Chapter 10 — NP-Completeness and Intractability |
+| Need a guarantee but not an optimal solution? | Chapter 11 — Approximation Algorithms |
+| Randomization seems to help? | Chapter 12 — Randomized Algorithms |
+| Linear constraints, linear objective? | Chapter 13 — Linear Programming |
+
+One column of the table deserves a comment. "Self-similar subproblems" and "overlapping subproblems" look like they might mean the same thing. They do not. Self-similar subproblems — where the problem breaks into smaller versions of itself without the sub-answers depending on each other — calls for divide-and-conquer. Overlapping subproblems — where the same sub-problem appears multiple times and recomputing it is wasteful — calls for dynamic programming. The distinction is real and it matters. Chapter 7 and Chapter 8 each explain their half of it, and Chapter 8 opens with a section called "Divide and Conquer versus Dynamic Programming" that makes the boundary precise.
+
+---
 
 ## How this book sits next to others
 
-Four other books occupy the same territory. Each fits a different reading position.
+Four other books occupy the same territory. Each fits a different reading position, and knowing which is which saves you from consulting the wrong one.
 
-**CLRS** (Cormen, Leiserson, Rivest, Stein, *Introduction to Algorithms*) is the academic canon. Definitive coverage, formal proofs, course-textbook scaffolding, hardcover price. Use CLRS when you need a proof, a theoretical bound, or a graduate-level treatment.
+**CLRS** — Cormen, Leiserson, Rivest, and Stein, *Introduction to Algorithms* — is the academic canon. Definitive coverage, formal proofs, the textbook scaffolding of a graduate course. Hardcover price. Use CLRS when you need a proof, a theoretical bound, or a graduate-level treatment. CLRS does not optimize for fast lookup. It optimizes for rigor. Those are different goals.
 
-**Sedgewick** (*Algorithms*, 4th edition) is Java-anchored, with full source listings and visualizations. Use Sedgewick when you want implementation-ready code in Java, with tightly integrated theory.
+**Sedgewick**, *Algorithms* (4th edition), is Java-anchored, with full source listings and visualizations integrated with the text. Use Sedgewick when you want implementation-ready code in Java with tightly integrated theory. It is excellent. It is also a different kind of book — it assumes you want to implement, not just identify and apply.
 
-**Skiena** (*Algorithm Design Manual*) is the interview-prep classic. The "war stories" sections are excellent. Use Skiena when you want practitioner anecdotes and a problem-shaped catalog.
+**Skiena**, *The Algorithm Design Manual*, is the interview-preparation classic and something more. The "war stories" sections — real problems from Skiena's consulting practice — are genuinely good. The catalog of problems in the second half is useful for pattern-matching. Use Skiena when you want practitioner anecdotes and a problem-shaped reference.
 
-***Algorithms in a Nutshell*** (Heineman, Pollice, Selkow, O'Reilly) was the closest match to this book. Out of print since 2015. [verify] No current Kindle-priced practitioner reference fills the slot it left. This volume occupies that slot.
+***Algorithms in a Nutshell*** (Heineman, Pollice, and Selkow, O'Reilly) was the closest antecedent to this book — Kindle-priced, practitioner-focused, designed for lookup. It has been out of print since approximately 2015. No current book fills the slot it left. This volume occupies that slot.
 
 This book is not a substitute for any of those. It is the cheap, plain-language, fast-lookup reference that complements them.
 
-## Decision rules — which chapter to consult
+<!-- → [TABLE: five-column comparison of this book vs. CLRS vs. Sedgewick vs. Skiena vs. Algorithms in a Nutshell — columns: book, price tier, primary use case, format (lookup/textbook/code listings), best for — reader sees at a glance which book to reach for which need] -->
 
-| You are asking | Start at |
-| --- | --- |
-| What does this cost? | Chapter 2 (Algorithm Analysis) |
-| What structure should I use? | Chapter 3 (Data Structures) |
-| Which sort? Which cache policy? | Chapter 4 (Sorting and Caching) |
-| Shortest path? Connectivity? Search? | Chapter 5 (Graphs) |
-| Is greedy provably optimal here? | Chapter 6 (Greedy) |
-| Self-similar subproblems? | Chapter 7 (Divide and Conquer) |
-| Overlapping subproblems? | Chapter 8 (Dynamic Programming) |
-| Bipartite matching? Min-cut segmentation? | Chapter 9 (Network Flow) |
-| Suspect this is NP-hard? | Chapter 10 (NP-Completeness) |
-| Need a guarantee but not optimal? | Chapter 11 (Approximation) |
-| Randomization seems to help? | Chapter 12 (Randomized) |
-| Linear constraints, linear objective? | Chapter 13 (Linear Programming) |
+---
 
-When the diagnosis is unclear, start at Chapter 2 or 3 and follow cross-references.
+## Three readers using this book
 
-## Worked example — three readers using the book
+Abstract descriptions of a book's purpose are less useful than watching the book actually do something. Here are three readers.
 
-**Reader A — picking a sort for a streaming workload.** A backend engineer is building a service that ingests time-stamped events and emits a sorted feed downstream. Throughput is bounded by sort cost. Reader A opens Chapter 4 (Sorting and Caching) and goes to "Decision rules" first. The table directs them to consider the data distribution: events arrive nearly sorted by timestamp with occasional out-of-order bursts. The Timsort discussion in §3 explains why standard library sorts (Python's `list.sort()`, Java's `Arrays.sort()` for objects) detect natural runs and exploit them. Reader A closes the chapter knowing the right call is the language-standard sort, not a hand-rolled quicksort, and has a one-line answer to a code reviewer who asks why.
+**Reader A — picking a sort for a streaming workload.** A backend engineer is building a service that ingests timestamped events and emits a sorted feed downstream. Throughput is bounded by sort cost. Reader A opens Chapter 4 and goes to the "Decision rules" section first. The table asks about the data distribution: events arrive nearly sorted by timestamp, with occasional out-of-order bursts. The section on Timsort explains that standard library sorts in Python and Java detect natural runs — sequences that are already sorted — and exploit them instead of sorting blindly from scratch. Reader A closes the chapter knowing the right call is the language-standard sort, not a hand-rolled quicksort, and has a one-sentence answer ready for any code reviewer who asks why.
 
-**Reader B — looking up Bayesian inference and being redirected.** A former biologist now working as a quant opens the book searching for "Bayes." The introduction's scope statement names the boundary: classical algorithms here, decision-making algorithms — Bayesian methods, optimal stopping, game theory — in Vol. 2. Reader B closes the book and orders Vol. 2. The redirect saved them an hour. The scope statement did its job.
+**Reader B — looking up Bayesian inference and being redirected.** A former biologist working as a quant opens the book searching for "Bayes." The introduction's scope statement names the boundary: classical algorithms here, decision-making algorithms in Vol. 2. Reader B closes the book and orders Vol. 2. The redirect took thirty seconds. The scope statement did its job. This is what a well-drawn boundary is for.
 
-**Reader C — cramming for an exam.** An undergraduate has CLRS Chapter 16 (greedy algorithms) assigned for a midterm in three days. They have read the chapter twice and the proofs are not landing. Reader C opens Chapter 6 (Greedy). The "Recognition pattern" section names the matroid and exchange-argument templates in plain English. The interval scheduling worked example walks through the exchange argument step by step. Reader C re-reads the CLRS chapter the next morning and the proofs land. The book did not replace CLRS. It made CLRS legible.
+**Reader C — using this book to unlock a harder book.** An undergraduate has CLRS Chapter 16 on greedy algorithms assigned for a midterm in three days. She has read the chapter twice and the proofs are not landing. She opens Chapter 6 of this book. The "Recognition pattern" section names the matroid and exchange-argument templates in plain English, without the formal apparatus. The interval scheduling worked example walks through the exchange argument step by step — here is the greedy choice, here is why swapping it out cannot improve the solution, here is what that structure is called. She re-reads the CLRS chapter the next morning and the proofs land. This book did not replace CLRS. It made CLRS legible.
 
-## Failure modes — when this book is the wrong reference
+Three readers, three uses. The book did not try to be all things. It tried to do one thing well.
 
-This book is the wrong reference when you need formal proofs (use CLRS), implementation-ready code in a specific language (use Sedgewick or the companion page), competitive-programming patterns at depth (use Skiena or *Competitive Programming Handbook*), or modern machine learning algorithms (use the *Algorithms by Bear* magazine).
+---
 
-The book is also wrong when you have not read Chapter 2. Every later chapter assumes you can interpret a complexity bound. If you skip Chapter 2 and open Chapter 8 cold, the recurrences will not parse. The fix is short: read Chapter 2 first.
+## When this book is the wrong book
 
-A third failure mode is treating decision rules as substitutes for understanding. Decision tables let you choose fast. The chapter sections explain *why* the choice is correct. When the rule disagrees with your judgment on a real problem, the section explains who is right.
+A book that tells you what it cannot do is more useful than one that pretends to do everything.
 
-## Cross-references
+This book is wrong when you need formal proofs. CLRS has them; this book does not. The complexity bounds here are stated and explained, not proven from axioms. If you are studying for a qualifying exam or writing a paper, you need the proofs.
 
-The "How the book is shaped" architecture above doubles as a cross-reference map. Foundations feed core methods; core methods feed optimization; randomization sits across the optimization cluster. Specific cross-references appear at the end of every chapter.
+This book is wrong when you need implementation-ready code in a specific language. Sedgewick, the companion page, or your standard library documentation does that. This book tells you which algorithm to reach for and what it costs. Code listings are elsewhere.
 
-For ML-era algorithms, see the *Algorithms by Bear* magazine. For decision-making algorithms, see Vol. 2.
+This book is wrong if you skip Chapter 2. This is worth saying directly: every later chapter assumes you can read a Big O bound and run a basic complexity argument. If you open Chapter 8 cold, the recurrences will not parse. Chapter 2 is short. Read it first.
 
-## Companion-page handoffs
+And this book is wrong — importantly wrong — when you treat the decision tables as substitutes for the chapter sections. The tables let you choose fast. The sections explain why the choice is correct. When a decision rule disagrees with your judgment on a real problem, the section is where you find out who is right. The table gets you to the right chapter. The chapter gets you to the right answer.
 
-This chapter has no companion-page handoffs. Chapter 1 is purely book-resident — the orientation and decision rules need to be in the book itself or they fail their purpose.
+---
 
 ## What this chapter does not enable
 
-This chapter does not teach any algorithm. No method has been explained. No complexity bound has been derived. The chapter is orientation only — what the book is for, how it is shaped, when to consult it. If you came here looking for an answer to a specific algorithmic question, the answer lives in one of the next twelve chapters; consult the decision table above.
+Nothing. This chapter is orientation only. No algorithm has been explained. No complexity bound has been derived. No method has been introduced.
+
+If you came here looking for an answer to a specific algorithmic question, the answer is in one of the next twelve chapters. The decision table above tells you which one. Go there.
+
+---
 
 ## Capability statement
 
-You can now navigate this book efficiently. You know what kind of reference it is, how its chapters are structured, when to consult it versus CLRS / Sedgewick / Skiena / the companion page / Vol. 2 / the magazine, and which chapter to open first for a given algorithmic question. The next time a problem lands on your desk that smells algorithmic, you know where to start.
+You can now navigate this book efficiently. You know what kind of reference it is — a lookup handbook, not a course textbook or a theoretical reference. You know how its chapters are structured and what each section is for. You know when to consult CLRS versus Sedgewick versus Skiena versus this book. You know which chapter to open first for a given algorithmic question. And you know when to close this book and reach for something else.
 
+The next time a problem lands on your desk that smells algorithmic, you know where to start.
+
+---
+
+## Exercises
+
+**Warm-up**
+
+1. Open the decision table in this chapter. For each of the following problems, identify the starting chapter the table directs you to, and write one sentence explaining why that chapter applies. (a) You need to find the minimum number of hops between two nodes in an unweighted network. (b) You have a list of job deadlines and want to maximize the number of jobs completed on time. (c) You suspect a scheduling problem you've been handed cannot be solved efficiently in the general case. *(Tests: navigating the decision table; translating problem descriptions into the table's diagnostic language.)*
+
+2. The table distinguishes "self-similar subproblems" from "overlapping subproblems." In your own words — without looking ahead to Chapters 7 or 8 — describe what you think the difference is based only on this chapter's explanation. Then name a type of problem you would expect each framing to apply to. *(Tests: reading comprehension of a precise distinction; preparing the conceptual ground for Chapters 7 and 8.)*
+
+3. Which two chapters does this chapter say must be read before any others, and what specific vocabulary does each one supply? State the answer in terms of what breaks if you skip each chapter. *(Tests: prerequisite awareness; understanding why the foundation chapters are non-optional.)*
+
+**Application**
+
+4. A colleague hands you a problem and says: "I think this is NP-hard, but I'm not sure, and even if it is, I need something I can ship." Map the two parts of that sentence to two different chapters in this book. Explain what each chapter would offer your colleague and what it would not. *(Tests: recognizing that NP-completeness diagnosis and approximation algorithms are separate questions answered by separate chapters.)*
+
+5. You are choosing between this book and CLRS to answer a specific question. For each of the following, state which book you would reach for and why. (a) You want to confirm the worst-case time complexity of heapsort. (b) You want to understand the formal proof that heapsort is optimal in the comparison model. (c) You want to know whether heapsort or Timsort is the right choice for your nearly-sorted input. *(Tests: understanding the distinct purposes of a lookup handbook versus a theoretical reference.)*
+
+6. The "Three readers" section describes Reader C using this book to unlock CLRS. Describe a fourth reader — a specific professional role, a specific algorithmic problem, a specific thing they need — and trace which chapter they would open, which section within that chapter they would go to first, and what they would have when they close the book. Use only chapters and sections described in this chapter. *(Tests: applying the book's navigation model to a novel scenario.)*
+
+**Synthesis**
+
+7. The chapter argues that a consistent chapter anatomy makes a reference book faster to use than a creative one. Evaluate that claim. What does consistency cost, if anything? What would a reader lose if each chapter were structured differently to fit its subject? *(Tests: reasoning about reference-book design as a deliberate trade-off.)*
+
+8. This chapter draws a boundary between what this book covers and what belongs to other books. Identify two topics — one that falls clearly inside the boundary and one that falls clearly outside it — and for each, explain what the boundary criterion is. Then identify one topic where you are genuinely uncertain which side of the boundary it falls on, and explain why the uncertainty exists. *(Tests: understanding scope as a design decision; applying the boundary argument to cases not explicitly named in the chapter.)*
+
+**Challenge**
+
+9. The chapter says: "The table gets you to the right chapter. The chapter gets you to the right answer." This implies the decision table is necessary but not sufficient. Design a situation in which following the decision table correctly — going to the right chapter — still leads an engineer to the wrong algorithmic choice. What does the engineer need from the chapter sections that the table cannot provide? *(Tests: understanding the limits of heuristic lookup tools; reasoning about when rules fail.)*
 
 ---
 
@@ -163,14 +262,14 @@ If my environment suggests a different language (Go, Rust, TypeScript),
 ask before defaulting to Python.
 ```
 
-**What this produces:** A committed repo with 13 chapter directories, a working CI scaffold, and the decision-card template ready to fill in. ~25 files, no algorithmic code yet.
+**What this produces:** A committed repo with 13 chapter directories, a working CI scaffold, and the decision-card template ready to fill in. Approximately 25 files, no algorithmic code yet.
 
 **How to adapt this prompt:**
 
 - *For your own project:* Replace Python with your language. Go: `go mod init`, table-driven tests, `testing.B`. Rust: Cargo with criterion benches. TypeScript: pnpm + vitest + tinybench.
 - *For ChatGPT / Gemini:* Both produce the same scaffold. Without Claude Code's file-write loop, ask for each file in a separate fenced block with the path commented at the top, then assemble locally.
 - *For Claude Code:* Native fit. Let it run the full create-and-commit loop before reviewing.
-- *For a Claude Project:* Skip — Claude Code is the right tool. (If you want continuity across sessions, create a Project that holds the repo's README and decision-card template as context for non-coding consultations.)
+- *For a Claude Project:* Skip — Claude Code is the right tool. If you want continuity across sessions, create a Project that holds the repo's README and decision-card template as context for non-coding consultations.
 
 **Connection to previous chapters:** None — this is the seed.
 
