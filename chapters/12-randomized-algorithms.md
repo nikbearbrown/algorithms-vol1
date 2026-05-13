@@ -1,175 +1,256 @@
-# Randomized Algorithms
+# Chapter 12 — Randomized Algorithms
 
-## TL;DR
+*The flip of a coin, taken seriously, turns out to be one of the most powerful tools in all of algorithm design.*
 
-A randomized algorithm makes random choices during execution. Reach for this chapter when you want to defeat adversarial inputs, when expected-time bounds beat worst-case bounds, when a simple randomized algorithm replaces a complicated deterministic one, or when the problem is genuinely probabilistic. After consulting it, you can choose between Monte Carlo (fixed time, probabilistic correctness) and Las Vegas (probabilistic time, certain correctness), apply linearity of expectation and basic concentration inequalities, recognize the canonical randomized algorithms, and distinguish algorithmic from cryptographic randomness.
+---
 
-## Recognition pattern
+Here is an algorithm for finding the minimum cut of a graph — the smallest set of edges whose removal disconnects it.
 
-Four signals.
+Pick a random edge. Merge its two endpoints into one vertex. Throw away any self-loops. Repeat until only two vertices remain. The edges between them are your cut. Output them.
 
-*Adversarial input would defeat a deterministic algorithm.* Quicksort with a fixed pivot policy is `O(n²)` on adversarial input; randomized pivot makes the expected case `O(n log n)` regardless of input. Hash tables with deterministic hash functions are vulnerable to collision attacks; per-process random seeds defend. Whenever input might be hostile, randomization is a defense.
+That's it. That's the whole algorithm. It fits in four lines of code. The only thing it does deliberately is pick edges randomly. It has no clever data structures. It does not look at the structure of the graph. It does not reason about which edges matter. It just contracts random edges until nothing is left.
 
-*A simpler randomized algorithm replaces a complex deterministic one.* Karger's min-cut is a few lines; the deterministic Stoer-Wagner min-cut is more involved. Randomized quickselect is simpler than median-of-medians for `k`-th order statistic. The randomized algorithm is often easier to write and easier to reason about.
+And it finds the minimum cut.
 
-*Concentration of measure makes the expected behavior reliable.* When you run a randomized algorithm on a problem with many independent random choices, the law of large numbers and concentration inequalities (Markov, Chebyshev, Chernoff) make the actual behavior tightly clustered around expectation. "Expected `O(n log n)`" with high concentration is a stronger statement than "average-case `O(n log n)`" — the algorithm's variance is bounded.
+Not every time — that's the part worth sitting with. It finds the minimum cut with probability at least $2/n^2$, where $n$ is the number of vertices. On a 100-vertex graph, that's a 0.02% chance per run. Run it often enough, and you find the minimum cut with any probability you want.
 
-*The problem is inherently probabilistic.* Counting approximations (Karger), nearest-neighbor approximation (LSH), Bayesian inference, simulation-based estimation. Some problems are best framed as probabilistic from the start.
+The fact that this works at all is the kind of result that should make you stop and think about what randomness is actually doing in an algorithm.
 
-A signal randomization is *not* the right tool: the problem is small and deterministic algorithms suffice. Randomization buys robustness, simplicity, or expected-time bounds; if you do not need any of those, the deterministic algorithm is preferable for reproducibility.
+---
 
-## What you need to know first
+## Two kinds of randomized algorithms
 
-This chapter assumes basic probability — sample spaces, events, expectation, variance. The probability primer on the companion page covers the prerequisites for any reader rusty on the basics. The chapter cites it once and uses it throughout.
+Before the analysis, a distinction that matters.
 
-This chapter also assumes Big O (Chapter 2) and graph fundamentals (Chapter 5). Karger's algorithm uses the contraction operation introduced in Chapter 5 §6. Randomized quicksort builds on quicksort (Chapter 4 §3 and Chapter 7).
+A **Las Vegas** algorithm uses randomness but always produces the correct answer. The running time is a random variable, but correctness is certain. Randomized quicksort is Las Vegas: whatever pivot it picks, however the recursion plays out, the array ends up sorted. You might wait longer or shorter depending on random choices, but you never get the wrong answer.
 
-For randomized rounding as an approximation technique, see Chapter 11 §4. For the algorithmic-complexity-attack defense via universal hashing, see Chapter 3 §6.
+A **Monte Carlo** algorithm uses randomness and always finishes in bounded time, but may produce an incorrect answer with bounded probability. Karger's min-cut is Monte Carlo: it always finishes in $O(n^2)$ time, but it might output a cut that isn't minimum. The error probability is controlled — and small — but it's there.
 
-## Monte Carlo vs Las Vegas
+These are duals. To turn a Monte Carlo algorithm into a Las Vegas algorithm, run it repeatedly until you get an answer you can verify. To turn a Las Vegas algorithm into a Monte Carlo algorithm, cut it off at a time bound and return whatever you have. The choice between them depends on whether you can cheaply verify a correct answer.
 
-Two ways to use randomness.
+The important thing: Las Vegas algorithms are *always correct*. The word "randomized" does not mean "approximately correct" or "probably correct on most inputs." A Las Vegas algorithm is as correct as any deterministic one — the randomness lives in the time budget, not the answer.
 
-**Monte Carlo.** Fixed running time, probabilistic correctness. The algorithm always finishes within a known time bound; the answer may be wrong with bounded probability. To improve correctness, run the algorithm multiple times. Examples: primality testing (Miller-Rabin), Karger's min-cut. The probability of error decreases exponentially in the number of trials.
+<!-- → INFOGRAPHIC: two-column comparison card — left column "Las Vegas": fixed correctness, variable time, example = randomized quicksort; right column "Monte Carlo": fixed time, variable correctness, example = Karger's min-cut; each column includes a one-line summary of the dual conversion ("run until verified" vs. "truncate at time bound"); makes the classification scannable without re-reading the prose -->
 
-**Las Vegas.** Probabilistic running time, certain correctness. The algorithm always returns the right answer; the running time is a random variable, with bounded expectation. Examples: randomized quicksort, randomized quickselect. To improve expected time, restart on slow runs.
+---
 
-The two are duals. Many randomized problems admit both formulations: a Monte Carlo algorithm with bounded error becomes a Las Vegas algorithm by repeated trial until verification succeeds (when verification is cheap). A Las Vegas algorithm becomes Monte Carlo by truncating execution at a time bound and accepting whatever partial result remains.
+## Why Karger's algorithm works
 
-The choice depends on what you can verify. If correct answers are easy to verify but hard to compute, Las Vegas is natural — keep trying until you get one that verifies. If correct answers are not easy to verify, Monte Carlo with multiple trials and majority vote (or amplification) is the better fit.
+Fix a minimum cut $C$ — any minimum cut, with $k$ edges. Karger's algorithm fails to find $C$ if and only if it contracts some edge in $C$ at some point during the $n-2$ contractions. So ask: what is the probability that $C$ survives all the way to the end?
 
-## The two essential tools
+The key observation is a counting argument. If the minimum cut has $k$ edges, then every vertex must have degree at least $k$ — otherwise, the edges incident to a low-degree vertex would form a cut smaller than the minimum, which is a contradiction. If every vertex has degree at least $k$ and there are $n$ vertices, the total degree is at least $kn$. Since the total degree is twice the number of edges, there are at least $kn/2$ edges in the graph.
 
-**Linearity of expectation.** `E[X + Y] = E[X] + E[Y]`, regardless of whether `X` and `Y` are independent. This is the workhorse of randomized analysis. Many bounds that look hard become easy via linearity: decompose the random quantity into a sum of indicator variables, compute the expectation of each, sum.
+At the first contraction step, the probability of picking an edge in $C$ is at most $k$ divided by the number of edges, which is at most $k / (kn/2) = 2/n$.
 
-Example. The expected number of comparisons made by randomized quicksort on `n` elements is `2n H_n − 4n ≈ 1.39 n log n` [verify]. The proof: `E[comparisons]` = sum over pairs `(i, j)` of `P(i and j are compared)`. Each probability is computable; the sum becomes the harmonic number bound.
+So the probability that the first step does *not* contract an edge in $C$ is at least $1 - 2/n$.
 
-**Concentration inequalities.** Bound the probability that a random variable deviates from its expectation. Three increasingly strong forms.
+After the first contraction, there are $n-1$ vertices, and the same argument applies. The minimum cut still has $k$ edges (you didn't touch any of them), and the graph still has at least $k(n-1)/2$ edges. The probability the second step avoids $C$ is at least $1 - 2/(n-1)$.
 
-*Markov's inequality.* For non-negative `X` and `t > 0`: `P(X ≥ t) ≤ E[X] / t`. Crude but always applicable.
+Multiply these probabilities across all $n-2$ contractions:
 
-*Chebyshev's inequality.* `P(|X − E[X]| ≥ k σ) ≤ 1/k²`, where `σ` is the standard deviation. Stronger than Markov when variance is bounded.
+$$P(\text{C survives}) \geq \prod_{i=0}^{n-3} \left(1 - \frac{2}{n-i}\right) = \frac{2}{n(n-1)}$$
 
-*Chernoff bounds.* For sums of independent bounded random variables, the tail decays exponentially in the deviation. The bound that justifies "high probability" claims in randomized analysis.
+<!-- → CHART: bar chart or step plot showing the per-step survival probability at each of the n-2 contraction steps — x-axis is contraction step number (1 to n-2), y-axis is the conditional probability of not contracting a min-cut edge at that step; the bars decrease from (1 - 2/n) toward (1 - 2/3) as the graph shrinks; the product of all bars is the total survival probability; student should see that the final steps are the most dangerous, not the first -->
 
-Use Chernoff when summing independent indicators; use Chebyshev when you have variance but not independence; use Markov when you have only non-negativity.
+For $n = 100$, this is about $0.0002$. Not great for a single run. But each run is independent, and the probability structure is precise. Run the algorithm $T$ times and take the smallest cut found. The probability that $C$ is never found across $T$ trials is at most:
 
-## Canonical randomized algorithms
+$$\left(1 - \frac{2}{n(n-1)}\right)^T$$
 
-**Randomized quicksort.** Pick the pivot uniformly at random from the subarray. Expected running time `O(n log n)` regardless of input. Worst case `O(n²)` is reached only with vanishing probability under random pivot choice. The algorithm Las Vegas — always correct, expected time bounded.
+Set $T = n^2 \ln n$ and the failure probability drops below $1/n$.
 
-**Randomized quickselect.** Find the `k`-th smallest element in expected `O(n)` time. Pivot selection randomized; recurse on the side containing position `k`. The expected linear bound is one of the cleanest applications of linearity of expectation.
+<!-- → CHART: line chart showing failure probability (y-axis, log scale) vs. number of trials T (x-axis) for n = 20, 50, 100 — three curves, each showing exponential decay; vertical reference lines at T = n^2/2 and T = n^2 ln n; student should see how quickly amplification reduces the per-trial ~2/n^2 success rate to near-certainty --> The algorithm now finds the minimum cut with high probability, in $O(n^4 \log n)$ total work. The Karger-Stein refinement brings this to $O(n^2 \log^3 n)$ by being smarter about when to branch the recursion — but the conceptual payoff is already here.
 
-**Karger's min-cut.** Worked example below.
+What makes this striking is not the bound, which is modest, but the method. The algorithm has no idea what the minimum cut is. It picks edges at random. It doesn't reason about structure. It just contracts, and the combinatorics work out such that any specific minimum cut has a guaranteed nonzero survival probability per run. Amplification does the rest.
 
-**Reservoir sampling.** Select a uniformly random `k`-element sample from a stream of unknown length, in `O(n)` time and `O(k)` space. Algorithm: keep the first `k` items; for the `i`-th item (`i > k`), replace a random sampled item with probability `k / i`. Each item ends up in the final sample with probability `k / n`.
+---
 
-**Locality-sensitive hashing (LSH).** Approximate nearest-neighbor search in high dimensions via hash functions that map nearby points to the same bucket with high probability. The deterministic alternative — building tree-based indexes that work in low dimensions — fails in high dimensions due to the curse of dimensionality. LSH gets sub-linear query time with bounded approximation error.
+## The two analytical tools
 
-**Bloom filter.** Probabilistic set membership with one-sided error. Covered in Chapter 3 §7; the analysis is randomized.
+Karger's analysis used a counting argument, but two tools handle the broad sweep of randomized analysis.
 
-**Skip list.** Randomized alternative to balanced search trees. Operations `O(log n)` expected; implementation simpler than red-black or AVL trees. The Linux kernel uses skip lists for some purposes [verify]; Redis uses skip lists in sorted sets [verify].
+**Linearity of expectation** is the workhorse. The expected value of a sum of random variables equals the sum of their expected values — regardless of whether the variables are independent. This seems modest. In practice it's powerful because it lets you decompose complicated random quantities into simple parts.
 
-**Randomized rounding for LP relaxation.** Solve the LP, treat fractional values as probabilities, round each variable to 1 with that probability. Often gives the same approximation ratio as deterministic LP rounding (Chapter 11) with a simpler analysis.
+Here is the classic application: how many comparisons does randomized quicksort make, in expectation?
 
-**Miller-Rabin primality test.** Probabilistic test for primality. Composite numbers are detected with probability ≥ 3/4 per round; running `k` rounds reduces the false-positive rate to `4^(−k)`. Deterministic primality testing exists (AKS, 2002) [verify] but Miller-Rabin remains the production choice because its constants are small and `k = 40` rounds gives error rate `≤ 2^(−80)`.
+Instead of tracking the recursion, track each pair of elements. Fix elements $a_i$ and $a_j$ where $i < j$ in sorted order. They are compared if and only if one of them is chosen as a pivot before any element between them is chosen as a pivot. Under uniform random pivot selection, each of the $j - i + 1$ elements is equally likely to be the first among them selected. So $P(\text{$a_i$ and $a_j$ compared}) = 2/(j - i + 1)$.
 
-**Treap, randomized BST.** Randomized variants of binary search trees that maintain balance probabilistically rather than via explicit rotations.
+The expected total number of comparisons is:
 
-## Cryptographic vs algorithmic randomness — the high-stakes distinction
+$$E[\text{comparisons}] = \sum_{i < j} \frac{2}{j - i + 1} = 2 \sum_{k=1}^{n-1} \frac{n-k}{k+1} \approx 2n \ln n$$
 
-This section is short and high-stakes per the chapter's design. The distinction is consequential and routinely confused.
+The key step was linearity of expectation: the expected total is the sum of expected contributions from each pair. No independence required.
 
-**Algorithmic randomness.** A pseudo-random number generator (PRNG) seeded with a fixed seed produces a deterministic sequence of bits that *looks* random for statistical purposes. Most language standard libraries provide such PRNGs (Mersenne Twister in Python and many others; xorshift, PCG, etc.). Adequate for randomized algorithms, simulation, sampling.
+**Concentration inequalities** tell you how tightly a random variable clusters around its expectation. You need three, in increasing strength.
 
-*Not adequate for cryptography.* Given enough output, the PRNG's seed can be reverse-engineered, and the entire future and past sequence becomes predictable.
+*Markov's inequality* says that for any non-negative random variable $X$ and any $t > 0$:
 
-**Cryptographic randomness.** A cryptographically secure PRNG (CSPRNG) — `/dev/urandom` on Linux, `BCryptGenRandom` on Windows, `SecureRandom` in Java, `secrets` module in Python — produces output that is computationally indistinguishable from true randomness, even given partial output. Required for keys, nonces, tokens, and any setting where an adversary has access to the algorithm's output and could exploit predictability.
+$$P(X \geq t) \leq \frac{E[X]}{t}$$
 
-The mistake to never make: using `Math.random()` or `random.random()` for security-sensitive purposes. The mistake destroys the security of the system. Authentication tokens generated with non-cryptographic PRNGs have been broken; production breaches have been traced to this exact failure [verify].
+If the expected value is small, large deviations are unlikely. This is very crude — it only uses the mean — but it applies to anything non-negative.
 
-The corrective: when in doubt about a randomness use, ask whether an adversary having access to outputs could exploit predictability. If yes, use a cryptographic source. If no — internal sampling, simulation, randomized algorithm pivots — non-cryptographic is fine and faster.
+*Chebyshev's inequality* uses the variance. If $X$ has mean $\mu$ and variance $\sigma^2$:
 
-## Decision rules
+$$P(|X - \mu| \geq k\sigma) \leq \frac{1}{k^2}$$
 
-| Situation | Approach |
-| --- | --- |
-| Adversarial input would break a deterministic algorithm | Randomize the algorithm |
-| Need always-correct, time may vary | Las Vegas |
-| Need always-fast, may be wrong | Monte Carlo (with retry/amplification) |
-| Need to bound expected time | Linearity of expectation |
-| Need to bound probability of large deviation | Chernoff (independent), Chebyshev (variance), Markov (only non-negativity) |
-| `k`-th order statistic | Randomized quickselect |
-| Min-cut in a graph | Karger (or Stoer-Wagner deterministic for small graphs) |
-| Random sample from a stream | Reservoir sampling |
-| Approximate nearest neighbor in high dimensions | LSH |
-| Fast set membership, false positives OK | Bloom filter (Chapter 3) |
-| Primality test on large numbers | Miller-Rabin |
-| Building a randomness-balanced BST | Treap or skip list |
-| Cryptographic key, token, nonce | CSPRNG (NEVER `Math.random()`) |
-| Simulation, sampling, algorithm pivot | Standard PRNG (Mersenne Twister, etc.) |
+Twice the standard deviation away from the mean: at most 25% probability. Three standard deviations: at most 11%. Stronger than Markov when variance is bounded.
 
-## Worked example — Karger's min-cut algorithm
+*Chernoff bounds* are the sharp tool. For a sum $X = X_1 + X_2 + \cdots + X_n$ of independent zero-one random variables with mean $\mu = E[X]$:
 
-The minimum cut of a graph is the smallest set of edges whose removal disconnects the graph. Deterministic algorithms exist (Stoer-Wagner runs in `O(V·E + V² log V)`), but Karger (1993) [verify] gave a strikingly simple randomized algorithm.
+$$P(X \geq (1 + \delta)\mu) \leq e^{-\mu \delta^2 / 3}$$
 
-**The algorithm.** Repeatedly pick a random edge and "contract" it — merge its two endpoints into a single vertex, removing self-loops, retaining parallel edges. Stop when only 2 vertices remain. The edges between those 2 vertices form a candidate cut. Output it.
+The tail decays *exponentially* in the deviation. This is what "high probability" means in algorithms — not "fairly likely" but "probability falling off like $e^{-n}$." When the conditions hold, Chernoff is tight and the guarantee is strong.
 
-```
-while |V| > 2:
-    pick a uniformly random edge (u, v)
-    contract (u, v): merge u and v, drop self-loops, keep parallel edges
-return remaining edges as the cut
-```
+The practical rule: use Chernoff when summing independent indicators; use Chebyshev when you have variance but not independence; use Markov when all you have is non-negativity.
 
-**The surprise.** This works. The algorithm finds the *minimum* cut with probability at least `1 / C(n, 2) = 2 / (n(n-1))` per run — roughly `2/n²`.
+<!-- → TABLE: three-row reference card for concentration inequalities — columns: "Inequality", "What you need to know about X", "What it bounds", "Tail decay", "When to use"; rows: Markov (only mean, one-sided, 1/t, always applicable), Chebyshev (mean + variance, two-sided, 1/k², variance bounded), Chernoff (independent indicators + mean, one-sided upper, exponential, sum of indicators); makes the selection rule scannable -->
 
-**The analysis (linearity-of-expectation flavor).** Fix any minimum cut `C` with `k` edges. The algorithm fails to find `C` only if some edge of `C` is contracted. At each contraction step, all remaining edges are equally likely to be picked. The minimum cut has `k` edges out of `m` total at the start; the probability that the first contracted edge is in `C` is at most `k / m`. A counting argument (every cut has at most `k` edges, every vertex has degree at least `k`, so `m ≥ kn/2`) gives `k/m ≤ 2/n`. Across `n−2` contractions, the probability `C` survives is bounded below by a product that simplifies to `2 / (n(n-1))`.
+---
 
-**Amplification.** A single run finds the min-cut with probability `≥ 2/n²`. Run the algorithm `T = n²/2` times and take the smallest cut found across runs; the failure probability drops to roughly `(1 − 2/n²)^(n²/2) ≈ 1/e ≈ 0.37`. Run `T = n² log n` times; failure probability is `1/n`. Run `T = n²` times; failure probability is essentially zero. Total time: `O(n² · contraction-time)` per run × `O(n² log n)` runs = `O(n^4 log n)` total [verify], beaten by the Karger-Stein refinement (1996) [verify] at `O(n² log³ n)`.
+## What randomization actually buys you
 
-**Why this is striking.** The algorithm makes no use of any structural property of the graph — no minimum-cut characterization, no flow theory. It just contracts random edges. The fact that this finds the min-cut with non-trivial probability is the kind of result that changes how you think about algorithms.
+There are four distinct reasons to reach for a randomized algorithm. Confusing them is the source of most confusion about what randomization is.
 
-**Production use.** Karger's is rarely the production min-cut algorithm because Stoer-Wagner has better deterministic bounds. But the *technique* — random contraction — has applications in cluster analysis, image segmentation pre-processing, and randomized approximation. The conceptual lesson exceeds the specific algorithm.
+**Defeating adversarial input.** A deterministic algorithm has predictable behavior — any adversary who knows the algorithm can construct input that drives it to worst case. Randomization removes this vulnerability. Quicksort with a fixed pivot strategy runs in $O(n^2)$ on sorted input; an adversary who knows your strategy can always hand you sorted input. Quicksort with a random pivot runs in expected $O(n \log n)$ *regardless of the input* — the adversary cannot control your random choices. The randomness is a defense mechanism.
 
-**Why this teaches randomization.** The algorithm illustrates the four moves of randomized analysis: a simple algorithm based on random choices, an expected-correctness bound, amplification by repetition, and a concentration argument that justifies "high probability" outcomes. Read it slowly; it is the cleanest example of how randomization works as a technique.
+This is the same reason that hash functions in production systems use per-process random seeds. Without them, an adversary who knows the hash function can craft inputs that all collide, turning every $O(1)$ lookup into $O(n)$. The defense is randomness the adversary cannot observe.
 
-## Failure modes — when "randomness in algorithms is just statistical noise" misleads
+**Getting simple algorithms.** Karger's min-cut is four lines. The deterministic Stoer-Wagner min-cut algorithm is substantially more involved. Randomized quickselect — find the $k$-th smallest element in expected $O(n)$ time — is a few lines. The deterministic median-of-medians that achieves worst-case $O(n)$ requires careful construction and larger constants.
 
-The misconception engaged: "Randomness in algorithms is just statistical noise."
+Often the simplest correct algorithm for a problem is randomized. This is not incidental. Deterministic algorithms frequently need to work around adversarial inputs by being clever about structure. Randomized algorithms can ignore structure entirely and let probability do the work.
 
-This treats randomization as decoration — adding noise to a deterministic procedure, with results that are the same up to small fluctuation. That reading is wrong on multiple counts.
+**Expected-time bounds that beat worst-case.** Randomized quicksort runs in expected $O(n \log n)$. No comparison sort can do better in the worst case — the $\Omega(n \log n)$ lower bound applies to all deterministic comparison sorts. But "expected $O(n \log n)$" under random pivots with good concentration is often better in practice than $O(n \log n)$ worst-case algorithms with larger constants.
 
-**Randomization can make impossible problems tractable.** Karger's min-cut runs in `O(n^4 log n)` randomized; finding min-cut without randomization is harder both conceptually and historically. The algorithm is not "noisy deterministic"; it is fundamentally different.
+The distinction between average-case and expected-case matters. Average-case analysis assumes something about the input distribution. Expected-case (Las Vegas) analysis holds *for all inputs* — the expectation is over the algorithm's random choices, not over the inputs. Randomized quicksort's expected $O(n \log n)$ bound holds for sorted input, reverse-sorted input, all-equal input, adversarial input. The randomness is internal.
 
-**Randomization defeats adversaries.** A deterministic algorithm has predictable behavior; an adversary who knows the algorithm can construct worst-case input. A randomized algorithm has behavior that depends on the algorithm's internal random choices, which the adversary cannot predict. The algorithmic-complexity attack on hash tables (Chapter 3 §6) is the production failure mode of treating randomization as cosmetic.
+**Intrinsically probabilistic problems.** Some problems are naturally framed probabilistically: approximate counting, nearest-neighbor search in high dimensions, streaming algorithms where you cannot store the whole input. These call for randomization not as a workaround but as the right frame from the start.
 
-**Las Vegas algorithms are always correct.** They are not "approximately correct" or "correct on average." They are correct, every time. The randomness lives in the time budget, not the answer.
+---
 
-**Monte Carlo with amplification gives high-confidence answers.** A 0.99-probability algorithm run 10 times in parallel, with majority vote, gives an error probability bounded by tail probabilities far below 0.01. The composition of randomized procedures with bounded error gives stronger guarantees than the misconception suggests.
+## A handful of canonical algorithms
 
-**Concentration inequalities are tight.** Chernoff bounds are not back-of-envelope estimates; they are mathematical theorems. When the conditions hold, the deviation probability really does decay exponentially. "Probabilistic" does not mean "vague."
+**Randomized quickselect.** Finding the $k$-th smallest element in an array. Pick a random pivot, partition the array, recurse on the side containing position $k$. Expected $O(n)$ time by linearity of expectation applied to the expected work at each level. The deterministic median-of-medians achieves worst-case $O(n)$ with more complicated pivot selection; quickselect is faster in practice and simpler to implement.
 
-**Cryptographic randomness is not interchangeable with algorithmic randomness.** This failure has shipped to production. Rolling a non-cryptographic PRNG for security-sensitive randomness is a class of bug that has caused real breaches. The failure mode is silent — code runs, tests pass, the security property is gone.
+**Reservoir sampling.** You have a stream of $n$ items, $n$ unknown in advance, and want to draw a uniform random sample of $k$ of them using $O(k)$ memory. Algorithm: keep the first $k$ items. For the $i$-th item (when $i > k$), replace a uniformly random currently-held item with probability $k/i$. By induction, after processing the first $i$ items, each of them is in the reservoir with probability exactly $k/i$. When the stream ends, the reservoir is a uniform random $k$-sample. This is used everywhere streaming data is sampled: analytics pipelines, database query optimizers, online learning.
 
-The corrective heuristic: state where the randomness comes from, what assumptions about its quality the algorithm needs, and what the correctness or expected-time bound is. Each piece is mathematical, not vague. The algorithm's behavior is precisely characterized; the precision is what makes randomization a tool rather than a hand-wave.
+**Locality-sensitive hashing.** Nearest-neighbor search in high dimensions is hard for deterministic tree-based methods because of the curse of dimensionality — all points become equidistant and trees lose their structure. LSH uses hash functions that map nearby points to the same bucket with high probability and far-away points to different buckets with high probability. You build an index of hash buckets; at query time, you hash the query and examine only the points in its bucket. Sub-linear query time at the cost of bounded approximation error. The method that powers similarity search in large-scale recommendation systems, document near-duplicate detection, and image retrieval.
 
-## Cross-references
+**Miller-Rabin primality testing.** Is this large number prime? The deterministic AKS algorithm (2002) runs in polynomial time, but Miller-Rabin has been the production choice for decades. It is Monte Carlo: each round detects a composite with probability at least 3/4. Running 40 independent rounds gives a false-positive probability of at most $4^{-40} \approx 10^{-24}$ — far below any reasonable threshold. You call it on a candidate prime, get a yes/no answer, and can calculate the residual uncertainty precisely.
 
-For randomized quicksort in production-sort context, see Chapter 4. For hash tables and the algorithmic-complexity attack defense, see Chapter 3 §6. For randomized rounding as approximation technique, see Chapter 11 §4. For Karger contraction in graphs, see Chapter 5 §6. For probability theory used here, see the companion-page primer.
+**Skip lists.** A randomized alternative to balanced binary search trees. Each element is inserted into a hierarchy of linked lists, with each level included with probability 1/2. Expected $O(\log n)$ for search, insert, and delete — the same asymptotic bound as a red-black tree, but with a simpler implementation that doesn't require explicit rebalancing logic. Redis uses skip lists for its sorted set data structure.
 
-## Companion-page handoffs
+---
 
-Probability primer (Markov/Chebyshev/Chernoff with worked examples); Karger-Stein min-cut walkthrough; LSH demo with high-dimensional nearest-neighbor benchmarks; Miller-Rabin primality test implementation; reservoir sampling examples; treap and skip-list implementations; cryptographic vs algorithmic randomness reading list with security-incident case studies. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-12.
+## The distinction you cannot afford to confuse
 
-## What this chapter does not enable
+One thing in this chapter is high-stakes in a way the rest is not.
 
-This chapter does not give full coverage of derandomization — the art of removing randomness from a randomized algorithm without losing the time bound. The method of conditional probabilities, pairwise-independent sample spaces, expander graphs, and the Nisan-Wigderson generator are research-level topics; for an introduction, see Motwani and Raghavan's *Randomized Algorithms* or Mitzenmacher and Upfal's *Probability and Computing*. The chapter also does not cover quantum algorithms, which are randomized in a fundamentally different sense and live outside the classical canon.
+Algorithmic randomness and cryptographic randomness are not the same thing.
 
-## Capability statement
+A standard pseudo-random number generator — Python's `random`, Java's `Math.random()`, the Mersenne Twister — is a deterministic function. It takes a seed and produces a sequence of bits that pass statistical tests for randomness. This is adequate for algorithm pivots, simulations, sampling, and everything in this chapter so far.
 
-You can now determine whether a randomized algorithm offers a useful tradeoff for a problem; choose between Monte Carlo (fixed time, probabilistic correctness) and Las Vegas (certain correctness, probabilistic time); apply linearity of expectation and basic concentration inequalities (Markov, Chebyshev, Chernoff); recognize the canonical randomized algorithms (quicksort, quickselect, Karger, reservoir sampling, LSH, Miller-Rabin); and distinguish algorithmic from cryptographic randomness — which is the high-stakes distinction the chapter asks you to never get wrong.
+It is *not* adequate for anything security-sensitive: generating authentication tokens, producing session keys, creating nonces, picking cryptographic parameters. A standard PRNG is deterministic; given enough output, an adversary can recover the seed and predict all future and past outputs. Systems that generate authentication tokens with non-cryptographic PRNGs have been broken. Real breaches have been traced to exactly this mistake.
 
+A cryptographically secure PRNG — `/dev/urandom` on Linux, `BCryptGenRandom` on Windows, the `secrets` module in Python, `SecureRandom` in Java — produces output that is computationally indistinguishable from true randomness even given partial output. This is what you use for anything where an adversary could exploit predictability.
+
+The test to apply: would an adversary who sees some outputs of this random source gain an advantage? If your answers to that question are "yes" or "maybe" or "I'm not sure," use a cryptographic source. If the answer is "no — these are internal algorithm choices that the adversary has no access to," a standard PRNG is fine and faster.
+
+This is a short section in the chapter but a long section in incident reports. The mistake is silent: the code runs, tests pass, and the security property is gone. Do not confuse the two.
+
+<!-- → TABLE: two-column reference card "Algorithmic vs. Cryptographic Randomness" — columns: "Property", "Algorithmic PRNG", "Cryptographic PRNG"; rows covering: examples (Mersenne Twister / /dev/urandom), predictability (recoverable from output / computationally indistinguishable), speed (fast / slower), use cases (pivots, sampling, simulation / tokens, keys, nonces), failure mode (adversary exploits predictability / N/A); caption should reinforce: when in doubt, use cryptographic -->
+
+---
+
+## What you can do now that you couldn't before
+
+You can classify a randomized algorithm as Monte Carlo or Las Vegas and know what each classification means about correctness and time. You can apply linearity of expectation to analyze expected running time by decomposing into indicator variables. You can choose among Markov, Chebyshev, and Chernoff based on what information you have about the random variable. You can explain why Karger's algorithm finds the minimum cut with probability $2/n(n-1)$ per run and how amplification makes this useful. You can recognize when randomization defends against adversarial input, when it simplifies the algorithm, and when the problem is inherently probabilistic.
+
+And you will never use `Math.random()` to generate an authentication token.
+
+The next chapter closes the optimization arc with linear programming — a framework that generalizes many of what we've built in the book, provides the dual of max-flow min-cut, and gives the LP relaxation technique that ties back to the approximation work in Chapter 11.
+
+---
+
+## Exercises
+
+### Warm-up
+
+**1.** Karger's algorithm is run once on a graph with $n = 10$ vertices. The minimum cut has $k = 3$ edges.
+
+   - (a) What is the probability that the minimum cut survives all 8 contractions? Use the product formula and compute the exact value.
+   - (b) How many independent trials are needed so that the probability of finding the minimum cut at least once exceeds 99%? Use the bound $T \geq n^2 \ln n / 2$ as your estimate, then check it: compute $(1 - 2/n(n-1))^T$ for your chosen $T$ and verify the failure probability is below 0.01.
+
+*(Tests: mechanical application of the Karger survival probability and amplification formulas.)*
+
+**2.** Classify each of the following as Las Vegas or Monte Carlo. For each, state what is fixed (time or correctness) and what is random.
+
+   - (a) Randomized quicksort
+   - (b) Karger's min-cut (single run)
+   - (c) Miller-Rabin primality test with 40 rounds
+   - (d) Reservoir sampling
+   - (e) An algorithm that runs Miller-Rabin until it gets two agreeing "prime" answers, then outputs "prime"
+
+*(Tests: Las Vegas vs. Monte Carlo classification; recognizing that amplification can convert one form to the other.)*
+
+**3.** Apply linearity of expectation to compute the expected number of comparisons made by randomized quicksort on an array of $n = 5$ elements (with values 1, 2, 3, 4, 5). For each of the $\binom{5}{2} = 10$ pairs $(a_i, a_j)$ with $i < j$, state the probability they are compared and compute the total expected comparisons. Then compare to the $2n \ln n$ approximation.
+*(Tests: linearity of expectation applied concretely; indicator variable decomposition on a small enough case to trace by hand.)*
+
+---
+
+### Application
+
+**4.** A deterministic quicksort always uses the first element as pivot. An adversary knows this.
+
+   - (a) Construct the worst-case input for this strategy on an array of 6 elements (hint: already-sorted input is one; what invariant does it satisfy?).
+   - (b) A randomized pivot is chosen uniformly at random. Explain precisely why an adversary who knows the algorithm — but not the random seed — cannot construct a worst-case input in the same way.
+   - (c) Randomized quicksort still has a worst case of $O(n^2)$. Why is this not a contradiction of the adversary argument?
+
+*(Tests: the adversarial input defense; understanding that "expected $O(n \log n)$ for all inputs" is different from "worst-case $O(n \log n)$".)*
+
+**5.** You are using reservoir sampling to maintain a uniform random sample of $k = 5$ items from a data stream. The stream so far has delivered 20 items, and the reservoir contains items at positions 3, 7, 11, 14, 19. The 21st item now arrives.
+
+   - (a) What is the probability that the 21st item is included in the reservoir?
+   - (b) If it is included, which item does it replace and with what probability?
+   - (c) After the replacement (if any), what is the probability that any specific item from the first 21 is in the final reservoir?
+
+*(Tests: reservoir sampling mechanics; the invariant that each of the first $i$ items is in the reservoir with probability $k/i$.)*
+
+**6.** Miller-Rabin primality test with $r$ rounds has a false-positive rate of at most $4^{-r}$ per composite number tested.
+
+   - (a) You need to generate 10,000 prime candidates for a cryptographic application. You run 20 rounds per candidate. What is an upper bound on the expected number of composites incorrectly declared prime?
+   - (b) Is this algorithm Las Vegas or Monte Carlo? Explain.
+   - (c) Why does the production community use Miller-Rabin rather than the deterministic AKS primality test, even though AKS is provably correct?
+
+*(Tests: Monte Carlo error analysis and amplification; the practical trade-off between bounded-error probabilistic and deterministic algorithms.)*
+
+---
+
+### Synthesis
+
+**7.** The chapter claims that "average-case analysis" and "expected-case (Las Vegas) analysis" are different claims about an algorithm's performance. Explain the distinction precisely using randomized quicksort as the example. Specifically: what does "average-case $O(n \log n)$" mean, what does "expected $O(n \log n)$" mean, and which is a stronger guarantee? For which kinds of inputs does the stronger guarantee matter?
+*(Tests: the average-case vs. expected-case distinction; understanding that expected-case bounds hold for all inputs, not just "typical" ones.)*
+
+**8.** You want to find the minimum cut of a graph with $n = 50$ vertices. You have two options: Karger's algorithm with $T = n^2 \ln n$ trials, or Stoer-Wagner (a deterministic algorithm running in $O(VE + V^2 \log V)$).
+
+   - (a) Estimate the number of Karger trials. How does this compare to one Stoer-Wagner run?
+   - (b) On what grounds would you choose Karger over Stoer-Wagner for a production system? On what grounds Stoer-Wagner over Karger?
+   - (c) The chapter says "the technique — random contraction — has applications beyond the specific algorithm." Name one application domain where Karger's contraction idea generalizes beyond exact min-cut, and explain why the probabilistic structure transfers.
+
+*(Tests: algorithmic trade-off reasoning; recognizing that the value of a randomized technique can exceed the specific algorithm it was designed for.)*
+
+---
+
+### Challenge
+
+**9.** The Chernoff bound applies to sums of *independent* zero-one random variables. Karger's analysis used a *product* of conditional probabilities instead. Explain why Chernoff cannot be directly applied to bound the probability that Karger's algorithm fails, and why the product-of-conditionals argument is the right structure instead. (Hint: are the indicator variables "does contraction $i$ hit the min-cut?" independent across steps?)
+*(Tests: understanding when Chernoff applies and when it doesn't; the structural reason Karger's analysis takes a different form.)*
+
+**10.** Design a randomized streaming algorithm for the following problem, or prove it cannot be solved in sub-linear space.
+
+   *Majority element.* A stream of $n$ items arrives one at a time. You must determine, at the end of the stream, whether any item appears more than $n/2$ times. If yes, output it. If no, output "none." You may use $O(\log n)$ memory. You may err with probability at most $1/3$.
+
+   Boyer-Moore majority vote is a deterministic $O(1)$-space algorithm but requires two passes. Design a single-pass randomized algorithm using $O(\log n)$ space. State the algorithm, analyze its error probability, and explain which concentration inequality governs its correctness guarantee.
+
+*(Tests: applying randomized algorithm design to a streaming problem; connecting concentration inequalities to a specific algorithm's correctness argument; open-ended design with evaluation criteria.)*
 
 ---
 
