@@ -1,210 +1,199 @@
-# NP-Completeness and Intractability
+# Chapter 10 — NP-Completeness and Intractability
 
-## TL;DR
+*The hardest problems are not impossible. They are hard in a precise sense, and the precise sense matters.*
 
-NP-completeness is a classification of problems for which no polynomial-time algorithm is known and none is believed to exist. Reach for this chapter when you suspect a problem is computationally hard and want to know what to do about it. After consulting it, you can recognize NP-hardness via reduction, correctly interpret what NP-hardness means in practice (it is not "impossible"), and choose between exact-exponential, approximation, heuristic, and special-case strategies for hard problems.
+---
 
-## Recognition pattern
+In the summer of 1971, Stephen Cook published a paper proving that one particular problem — Boolean satisfiability, the question of whether a logical formula with variables and AND/OR/NOT connectives can be made true — was in a specific sense the hardest problem of its type. Not just hard. The hardest, in a way that could be made mathematically precise.
 
-The signal: a problem looks combinatorial. It involves choosing among exponentially many configurations — assignments, subsets, orderings, partitions — and the obvious algorithm enumerates them. You are not confident a polynomial-time algorithm exists. You suspect there is some classical hard problem hiding inside yours.
+The argument was this: every problem whose solutions can be verified quickly can be transformed, in polynomial time, into a SAT instance. Solve SAT efficiently and you solve all of them. SAT was not one hard problem among many. It was a representative of an entire class of problems that were all, in a formal sense, equivalent in difficulty.
 
-Three concrete signs to check.
+This discovery, independently made by Leonid Levin in the Soviet Union around the same time, opened a floodgate. Richard Karp published 21 more problems in the same equivalence class in 1972. By 1979, Garey and Johnson's catalog had hundreds. Today there are thousands. Graph coloring, traveling salesman, protein folding, circuit layout, scheduling, packing, covering, partitioning — problems from every domain of engineering and science — all in the same class.
 
-*The problem matches a canonical NP-complete pattern.* SAT, 3-SAT, vertex cover, independent set, clique, graph coloring, Hamiltonian cycle, traveling salesman, subset sum, set cover, bin packing, integer programming. If your problem rephrases as one of these, NP-hardness is almost certain. The classical list (Garey and Johnson 1979) [verify] catalogs hundreds.
+The class is called NP-complete, and this chapter is about what it means, how to recognize it, and — most importantly — what to do about it.
 
-*A polynomial reduction from a known NP-hard problem maps to your problem.* If you can transform 3-SAT (or any NP-hard problem) into your problem in polynomial time, your problem is at least as hard as 3-SAT — therefore NP-hard.
+---
 
-*The problem space grows exponentially with input size, and there is no obvious structure to exploit.* Brute force is `2^n` or `n!`; greedy gives wrong answers; DP either gives `O(2^n)` solutions (which is exact-exponential, not polynomial) or fails because the subproblem space is exponential.
+## Four classes, and why the distinctions matter
 
-A signal NP-completeness is *not* the right framing: the problem is solvable in polynomial time and you have not noticed. Worth checking before declaring intractability — many problems that look hard have polynomial-time algorithms via flow (Chapter 9), DP (Chapter 8), or matroid theory (Chapter 6).
+The theory of computational complexity partitions problems by how the resources needed to solve them scale with input size. Four classes are essential to understand, because they are routinely conflated and the conflation leads to genuine engineering mistakes.
 
-The misconception engaged in §9 is the bigger trap: assuming NP-complete means impossible. It does not, and the chapter's most actionable content — §6 — is what to do instead.
+**P** is the class of problems solvable in polynomial time by a deterministic algorithm. Polynomial time means the running time is `O(n^k)` for some constant `k`, where `n` is the input size measured in bits. Sorting is in P. Shortest path is in P. Linear programming is in P — Khachiyan proved this in 1979. Problems in P are considered tractable: as inputs grow, the computation time grows in a manageable way.
 
-## What you need to know first
+**NP** is the class of problems whose yes-instances have solutions that can be verified in polynomial time. The "NP" stands for nondeterministic polynomial — the original definition involved a nondeterministic machine that could guess the right answer, but the cleaner intuition is verification: given a candidate solution, you can check it quickly. SAT is in NP: given a truth assignment to all variables, you can check whether every clause is satisfied in polynomial time. Hamiltonian cycle is in NP: given a candidate cycle, you can verify that it visits every vertex exactly once in polynomial time. P is a subset of NP — if you can solve a problem in polynomial time, you can certainly verify a solution in polynomial time, by solving it yourself and checking the claim.
 
-This chapter assumes Big O (Chapter 2), basic graph theory (Chapter 5), and DP (Chapter 8) for the exact-exponential algorithms section. For approximation algorithms with provable ratios on NP-hard problems, see Chapter 11. For randomized algorithms applied to hard problems, see Chapter 12. For LP-based exact and approximate solutions, see Chapter 13.
+**NP-hard** means something is at least as hard as the hardest problems in NP, in the following precise sense: every problem in NP can be transformed into it in polynomial time. If you had a polynomial-time algorithm for an NP-hard problem, you could use it — together with the transformation — to solve every problem in NP in polynomial time. NP-hard problems need not themselves be in NP. The halting problem is NP-hard but undecidable, which means it is not solvable by any algorithm at all, let alone a polynomial-time one.
 
-## P, NP, NP-complete, NP-hard
+**NP-complete** means both: in NP (solutions are verifiable quickly) and NP-hard (everything in NP reduces to it). NP-complete problems are the hardest problems in NP. Cook's theorem proved SAT is NP-complete. Karp's 21 problems are NP-complete. The thousands in Garey and Johnson are NP-complete.
 
-Four formal classes. The definitions matter because they are routinely conflated in practice.
+The big open question is whether P equals NP. No proof exists either way. If P = NP, then every NP-complete problem has a polynomial-time algorithm that nobody has found yet — solutions could be found as quickly as they can be verified. If P ≠ NP, which is what essentially everyone in computer science believes, then NP-complete problems have no polynomial-time algorithms, ever. The Clay Mathematics Institute has offered a million-dollar prize for a proof in either direction.
 
-**P.** Problems solvable in polynomial time by a deterministic algorithm. "Polynomial time" means the running time is `O(n^k)` for some constant `k`, where `n` is the input size in bits. P is the class of problems considered tractable. Sorting is in P. Shortest path is in P. Linear programming is in P (Khachiyan 1979) [verify].
+For working engineers, the practical stance is: assume P ≠ NP. If you find a polynomial-time algorithm for an NP-complete problem, you have either made an error or solved the most famous open problem in mathematics.
 
-**NP.** Problems whose *yes-instances* have polynomial-time *verifiable* certificates. A solution can be checked quickly even if finding one is hard. SAT is in NP: given a candidate assignment, you can check satisfaction in polynomial time. Hamiltonian cycle is in NP: given a candidate cycle, you can verify it visits every vertex once in polynomial time. P ⊆ NP (every polynomial-time algorithm is also a polynomial-time verifier on its own output).
+<!-- → [INFOGRAPHIC: Venn diagram of P, NP, NP-complete, and NP-hard — P as a circle inside NP, NP-complete as the boundary ring of NP, NP-hard as the region containing NP-complete and extending beyond NP (with the halting problem labeled outside NP); each region labeled with one or two canonical examples] -->
 
-**NP-hard.** A problem is NP-hard if every problem in NP can be reduced to it in polynomial time. NP-hard problems are at least as hard as the hardest problems in NP. NP-hard problems need not themselves be in NP — the halting problem is NP-hard but undecidable, far beyond NP.
+---
 
-**NP-complete.** A problem that is both in NP and NP-hard. The "hardest" problems in NP, in the precise sense that all of NP reduces to them. The first proven NP-complete problem was SAT (Cook 1971; independently, Levin 1973) [verify]. Karp (1972) [verify] gave 21 more, opening the floodgates; the modern catalog has thousands.
+## How to recognize NP-completeness
 
-The big open question: **does P = NP?** No proof either way exists. The consensus in theoretical CS is that P ≠ NP, but the consensus is unproven. If P = NP, every problem in this chapter has a polynomial-time algorithm we just have not found; if P ≠ NP (the believed case), no such algorithm exists for any NP-complete problem.
+The recognition question has two directions: proving a problem is NP-hard, and recognizing the patterns that suggest it.
 
-For practical purposes, treat P ≠ NP as the working assumption. If you find a polynomial-time algorithm for an NP-complete problem, you have either made a mistake or solved a Millennium Prize Problem.
+The proof technique is **reduction**. A polynomial-time reduction from problem A to problem B is an algorithm that transforms any instance of A into an instance of B in polynomial time, such that the answer to B on the transformed instance gives the answer to A on the original. If A is NP-hard and you have a polynomial-time reduction from A to B, then B is NP-hard — any efficient algorithm for B would imply an efficient algorithm for A, which would imply efficient algorithms for everything in NP.
 
-## Reductions — the proof technique
+To prove a new problem X is NP-hard, find a known NP-hard problem Y and build a polynomial-time reduction from Y to X. The reduction certifies that X is at least as hard as Y.
 
-A polynomial-time reduction from problem `A` to problem `B` is a polynomial-time algorithm that transforms instances of `A` into instances of `B` such that the answer to `A` can be read from the answer to `B`. If `B` has a polynomial-time algorithm, so does `A` (apply the reduction, then solve `B`). Equivalently: if `A` is hard, so is `B`.
+3-SAT is the standard starting point for NP-hardness proofs. It is a version of SAT where every clause has exactly three literals. It is NP-complete. The canonical reductions — 3-SAT to vertex cover, to independent set, to clique, to graph coloring, to subset sum — are the scaffolding from which thousands of other hardness proofs are built. Knowing a handful of them is enough to handle most new cases: you find the one whose structure most resembles your problem, adapt the reduction, and the hardness follows.
 
-To prove a problem `X` is NP-hard, reduce a known NP-hard problem `Y` to `X`. The reduction certifies that `X` is at least as hard as `Y`.
+The practical recognition patterns are three. The first: your problem is an instance of a known NP-complete problem rephrased. Vertex cover, independent set, graph coloring, Hamiltonian cycle, traveling salesman, subset sum, set cover, bin packing — if your problem is secretly one of these, its hardness is inherited directly. The catalog is large and well-indexed.
 
-**Canonical reductions.** Knowing a few standard reductions covers many practical cases.
+The second: the obvious algorithm for your problem enumerates an exponentially large search space. You are choosing among subsets of n items, or orderings of n cities, or assignments of n variables to binary values. Greedy gives wrong answers. Dynamic programming requires a state space that is itself exponential. The problem looks like it wants to be solved by trying everything.
 
-- **3-SAT to vertex cover.** Standard textbook reduction; clauses become triangles, variables become edges between literal-vertices.
-- **3-SAT to independent set.** Same construction read differently — vertex cover and independent set are complementary.
-- **3-SAT to clique.** Variant construction.
-- **3-SAT to graph coloring.** Each variable's literals are connected; clause gadgets enforce satisfaction; color classes encode truth values.
-- **Vertex cover to set cover.** Standard reduction; each vertex becomes a set covering its incident edges.
-- **Hamiltonian path to TSP.** Add edges with appropriate weights.
-- **Subset sum to partition.** Standard.
-- **3-SAT to integer linear programming.** Each variable becomes a 0/1 integer; clauses become linear constraints.
+The third: there is no obvious structure to exploit. Chapter 9 showed that network flow solves many problems that look hard by coincidence of phrasing — bipartite matching, maximum cut in certain graph classes, assignment problems. Chapter 8 showed that dynamic programming solves problems that look exponential because they have overlapping subproblems with compact structure. Chapter 6 showed that greedy algorithms solve problems with matroid structure optimally. If none of these frameworks fit, the problem may genuinely be hard.
 
-When in doubt, reduce from 3-SAT. It is the workhorse starting point for NP-hardness proofs.
+Worth checking before concluding NP-hardness: many problems that look hard are in P because a non-obvious polynomial algorithm exists. 2-SAT is solvable in linear time; 3-SAT is NP-hard. Maximum weight matching in bipartite graphs is polynomial; in general graphs it is harder but still polynomial. Graph coloring with 2 colors is polynomial (bipartiteness); with 3 or more it is NP-hard. The difference of one variable in a problem's structure can move it from P to NP-complete.
 
-**Reductions also show problems are NOT NP-hard.** If you reduce your problem to bipartite matching (polynomial), or shortest path (polynomial), or LP (polynomial), it is in P. The reduction is the proof in either direction.
+<!-- → [CHART: reduction graph showing 3-SAT at the top with directed arrows to vertex cover, independent set, clique, graph coloring, subset sum, set cover, and TSP — each arrow labeled with a one-phrase description of the reduction; reader sees the canonical scaffolding at a glance] -->
 
-## Common NP-complete problems
+---
 
-A short catalog. The full Garey-Johnson catalog has more than 300 problems [verify]; the practitioner relevant subset is maybe two dozen.
+## The catalog of hard problems
 
-**SAT and 3-SAT.** Boolean satisfiability. The Cook-Levin theorem proves these NP-complete; they are the universal "starting point" for reductions.
+The full catalog has thousands of entries. The working engineer needs perhaps two dozen. Here they are.
 
-**Vertex cover.** Minimum set of vertices touching every edge.
+**SAT and 3-SAT.** Boolean satisfiability: given a formula in conjunctive normal form, is there an assignment of variables making it true? Cook's theorem makes SAT the universal starting point. 3-SAT restricts clause size to exactly three literals.
 
-**Independent set.** Maximum set of pairwise non-adjacent vertices.
+**Vertex cover.** Find the minimum set of vertices such that every edge touches at least one of them. Every graph has a vertex cover of size n (all vertices); the question is the minimum.
 
-**Clique.** Maximum complete subgraph.
+**Independent set.** Find the maximum set of vertices with no two adjacent. Vertex cover and independent set are complementary: a set S is a vertex cover if and only if its complement is an independent set.
 
-**Graph coloring (chromatic number).** Minimum colors needed so adjacent vertices have different colors. NP-hard for `k ≥ 3`. Worked example below.
+**Clique.** Find the maximum complete subgraph — a set of vertices all pairwise adjacent.
 
-**Hamiltonian cycle / path.** Cycle / path visiting every vertex exactly once.
+**Graph coloring.** Assign colors to vertices so no two adjacent vertices share a color, using the minimum number of colors. NP-hard for 3 or more colors. The chromatic number of a graph is the answer; computing it is hard.
 
-**Traveling salesman (TSP).** Minimum-cost cycle visiting every vertex. NP-hard in general; admits a 1.5-approximation in the metric case (Christofides 1976) [verify].
+**Hamiltonian cycle and path.** Does a cycle (or path) exist that visits every vertex exactly once? Eulerian circuits — visiting every edge exactly once — are polynomial by Euler's theorem. The one-word difference (vertex vs. edge) puts one in P and the other in NP-complete.
 
-**Subset sum / partition.** Find a subset summing to a target. Pseudo-polynomial DP exists (Chapter 8); NP-hard in the bit-length sense.
+**Traveling salesman.** Find the minimum-cost cycle visiting every city exactly once. NP-hard in general. Admits a 1.5-approximation in the metric case (Christofides 1976), recently improved slightly. Exact algorithms (Held-Karp) handle instances to a few thousand cities with modern hardware.
 
-**Knapsack.** 0/1 knapsack. Pseudo-polynomial DP; FPTAS exists (Chapter 11).
+**Subset sum.** Given a set of integers and a target, does any subset sum to the target? NP-hard in the bit-length sense. Has a pseudo-polynomial dynamic programming algorithm — polynomial in the numeric value of the target, exponential in the number of bits encoding it. This distinction matters; Chapter 8 covers it.
 
-**Set cover / hitting set.** Greedy `ln n`-approximation (Chapter 6, 11); inapproximable below `ln n` unless P = NP (Feige 1998) [verify].
+**Knapsack.** Given items with weights and values and a weight capacity, maximize total value. Same pseudo-polynomial DP as subset sum. Admits an FPTAS — a polynomial-time approximation scheme with any desired accuracy.
 
-**Bin packing.** Pack items into minimum number of fixed-capacity bins.
+**Set cover.** Given a universe and a collection of subsets, find the minimum number of subsets whose union covers the universe. Greedy achieves a `ln n` approximation; this is essentially optimal unless P = NP.
 
-**Integer linear programming.** General ILP is NP-hard; certain special cases (totally unimodular constraint matrices) are in P (Chapter 13).
+**Integer linear programming.** Optimize a linear objective over linear constraints where variables must take integer values. NP-hard in general. Special structure (totally unimodular matrices) makes certain ILP instances polynomial — Chapter 13 covers this.
 
-**Steiner tree.** Minimum-weight tree connecting a specified subset of vertices. NP-hard; constant-factor approximation exists.
+<!-- → [TABLE: catalog of NP-complete problems — columns: problem, decision version, best known exact bound, best approximation ratio, special tractable cases — one row per problem listed above; reader sees all eleven at once for comparison and lookup] -->
 
-## What to do when a problem is NP-complete
+---
 
-This section is the chapter's most actionable content. NP-completeness is not a verdict of impossibility — it is a notice that polynomial-time exact algorithms are not available, and you must choose among alternatives.
+## What to do about it
 
-**1. Solve exactly with an exponential algorithm if `n` is small.**
+This is the chapter's most important section. NP-completeness is not a verdict. It is a classification that says: polynomial-time exact algorithms are not available, so choose among the alternatives.
 
-Many NP-hard problems have exact algorithms substantially faster than brute-force `n!`. Held-Karp solves TSP in `O(n² · 2^n)` (Chapter 8) — feasible for `n ≤ 25` or so [verify]. Branch-and-bound and SAT solvers handle problems with thousands of variables on real-world instances. Modern SAT solvers (Glucose, MiniSAT, CaDiCaL, Kissat) [verify] routinely handle industrial instances with millions of clauses despite the worst-case exponential bound.
+**Solve exactly if n is small.** Many NP-hard problems have exact algorithms substantially faster than brute-force enumeration. Held-Karp solves TSP in `O(n² · 2^n)` — better than `n!` by an enormous factor, and feasible for n up to roughly 25. Branch-and-bound algorithms with intelligent pruning handle much larger instances on problems with good bounding functions. Modern SAT solvers — Glucose, MiniSAT, CaDiCaL, Kissat — routinely handle industrial instances with millions of clauses, exploiting unit propagation, clause learning, and restart strategies that make typical-case complexity far better than worst case. The worst case is exponential; the typical case on structured real-world instances is often effectively polynomial. "Exact algorithm with exponential worst case" does not mean "slow in practice."
 
-The phenomenon: real-world instances often have structure that exact algorithms exploit. The worst case is exponential; the typical case is polynomial. This is the "easy hard problems" observation that drives modern combinatorial optimization.
+**Approximate with a guaranteed ratio.** For many NP-hard problems, polynomial-time algorithms exist with provable approximation ratios. Vertex cover admits a 2-approximation — always within a factor of 2 of optimal — via a simple maximal matching. Set cover admits a `ln n`-approximation via greedy, and this is the best possible ratio unless P = NP. Metric TSP admits a 1.5-approximation. Knapsack admits an FPTAS: for any ε > 0, a polynomial-time algorithm returns a solution with value at least `(1 − ε)` of optimal. The trade-off is optimality for a polynomial-time algorithm with a bound on how far the solution can stray. Chapter 11 covers approximation algorithms in full.
 
-**2. Approximate with a guaranteed ratio.**
+**Apply heuristics when guarantees are not required.** Local search, simulated annealing, genetic algorithms, and tabu search produce good solutions on real instances without theoretical bounds. Used heavily in practice — in logistics, circuit layout, scheduling, bioinformatics — when instances are too large for exact algorithms and the structure is too irregular for guaranteed approximation. The trade-off: you give up formal guarantees in exchange for practical performance on workloads that resist analytical treatment.
 
-For many NP-hard problems, polynomial-time algorithms exist with provable approximation ratios. Vertex cover admits a 2-approximation. Set cover admits a `ln n`-approximation. Metric TSP admits a 1.5-approximation. Knapsack admits an FPTAS — a polynomial-time scheme with `(1+ε)` approximation for any `ε > 0`. See Chapter 11 for the full treatment.
+**Exploit special-case structure.** Many NP-hard problems become polynomial on restricted input classes. Vertex cover is polynomial on bipartite graphs — König's theorem gives an equivalence to maximum matching. Graph coloring is polynomial for 4 colors on planar graphs (Four Color Theorem) but NP-hard for 3 colors even on planar graphs. 2-SAT is linear time; 3-SAT is NP-hard. Problems on graphs of bounded treewidth admit polynomial-time algorithms via tree decomposition for many otherwise hard problems. Look for the structure your real instances actually have. A general NP-hard problem may be tractable on the specific slice that matters to you.
 
-The trade-off: you give up optimality but gain a polynomial-time algorithm with a provable bound on solution quality.
+**Use parameterized complexity.** If an NP-hard problem has a natural parameter k that is small in practice, an algorithm running in `O(f(k) · n^c)` is feasible when k is small even if n is large. Vertex cover is fixed-parameter tractable in the cover size: a `O(2^k · n)` algorithm exists. For k ≤ 30, this is practical regardless of n. Many problems that are hopeless as general instances are tractable with the right parameterization.
 
-**3. Heuristic with no guarantee.**
+**Encode as SAT or ILP and let a solver handle it.** Modern SAT solvers and ILP solvers — Gurobi, CPLEX, OR-Tools — handle problem sizes that would have been infeasible a decade ago. If you can formulate your problem as SAT or integer linear programming, you can hand it to a solver without implementing a custom algorithm. This is the default engineering approach for many NP-hard problems in industrial practice. The encoding is the skill; the solver does the search.
 
-Local search, simulated annealing, genetic algorithms, tabu search, and similar techniques produce good solutions on real-world instances without theoretical guarantees. Used heavily in practice when the instances are too large for exact and the structure is too irregular for guaranteed approximation.
+**Be aware of phase transitions.** Many NP-hard problems show a phase transition — a critical density or parameter value below which instances are easy (almost certainly satisfiable or solvable) and above which they are also easy (almost certainly unsatisfiable or infeasible), with a narrow hard region near the transition. For 3-SAT, the hard region is near a clause-to-variable ratio of approximately 4.26. Random instances near this ratio are notoriously difficult; instances far from it are not. If your real instances cluster away from the phase transition, the worst-case bound is a poor predictor of your wall-clock time.
 
-The trade-off: you give up theoretical bounds but gain practical performance on workloads that resist formal analysis.
+<!-- → [CHART: 3-SAT phase transition — x-axis: clause-to-variable ratio, y-axis: solver time (log scale) — sharp peak near ratio 4.26, with "easy-satisfiable" region left and "easy-unsatisfiable" region right labeled; student sees the phase transition visually and understands why the hard region is narrow] -->
 
-**4. Solve a special case.**
+---
 
-Many NP-hard problems become polynomial on restricted inputs. Vertex cover is polynomial on bipartite graphs. Graph coloring is polynomial on planar graphs for `k = 4` (Four Color Theorem) [verify] but NP-hard for `k = 3` even on planar graphs. 2-SAT is polynomial; 3-SAT is NP-hard. Tree-decomposable graphs of bounded treewidth admit polynomial-time algorithms for many otherwise hard problems.
+## Worked example: course scheduling as graph coloring
 
-Look for the structure your real instances actually have. A general NP-hard problem may be tractable on the slice you care about.
+A university must assign courses to time slots such that no student is enrolled in two courses in the same slot. Given a set of courses and the student enrollment in each, what is the minimum number of time slots needed?
 
-**5. Fixed-parameter tractable algorithms.**
+The reduction to graph coloring is direct. Build a graph with one vertex per course. Add an edge between two courses if they share at least one enrolled student. Courses sharing a student cannot share a time slot; adjacent vertices in the graph cannot share a color. The minimum number of time slots equals the chromatic number of the graph.
 
-If a problem is hard in general but admits an algorithm running in `O(f(k) · n^c)` for some parameter `k` (independent of `n`), the problem is fixed-parameter tractable (FPT). Vertex cover is FPT in the cover size: `O(2^k · n)` is feasible for `k` up to roughly 30 on real instances [verify]. Many parameterized problems are FPT.
+Why the chromatic number? Any valid schedule assigns each course a time slot — a coloring of the vertex. Any two courses sharing a student get different slots — adjacent vertices get different colors. Conversely, any proper coloring of the graph corresponds to a valid schedule. The problems are equivalent.
 
-**6. SAT or ILP encoding.**
+Graph coloring with three or more colors is NP-hard. The reduction inherits the hardness: scheduling a university's courses in the minimum number of time slots is, in general, as hard as graph coloring.
 
-Modern SAT solvers and ILP solvers (Gurobi, CPLEX, OR-Tools) handle problem sizes that would have been infeasible 20 years ago [verify]. If you can encode your problem as SAT or ILP, the solver does the rest. This is the engineering default for many practical NP-hard problems.
+What real universities actually do is instructive. They do not solve the global optimization from scratch each term. They start from last term's schedule and modify it incrementally for new courses and changed enrollments, which reduces the effective instance size by orders of magnitude. The algorithms used are heuristics — DSATUR (saturation-degree greedy) and RLF (recursive largest first) — that produce schedules close to optimal on instances with the structure real enrollment data has, which is far from worst case. When the constraints are complex enough — faculty preferences, room accessibility, examination windows, accreditation requirements — the problem is encoded as an integer linear program and handed to a solver. The solution emerges in minutes to hours.
 
-**7. Phase-transition awareness.**
+The resulting schedule has conflicts. A faculty member assigned to two simultaneous sections. A classroom used twice. An accessibility constraint violated. A human scheduler reviews the output, edits, and re-runs. After several iterations, an acceptable schedule emerges. The algorithm is a partner in the process, not a black box delivering a final answer.
 
-Many NP-hard problems show a phase transition — instances near a critical density are exponentially hard, instances far from it are easy. 3-SAT instances with clause-to-variable ratio near 4.26 are notoriously hard; ratios well above or below are easy [verify]. If your real instances cluster on the easy side, the worst-case bound does not predict your wall-clock time.
+Three lessons from this example. First, NP-hard problems are routinely solved on the instances that actually arise in practice. Second, the engineering approach is almost never pure optimization from scratch — it is incremental, heuristic, iterated, and problem-specific. Third, the hardness is not a reason to stop. It is a reason to choose carefully among the seven options listed above.
+
+<!-- → [IMAGE: course-scheduling conflict graph — small example with 8 courses as vertices, edges drawn between courses sharing at least one student, and a valid 3-coloring shown with colored vertices — student sees the reduction made concrete, not just described] -->
+
+---
+
+## What "NP-complete means impossible" gets wrong
+
+The most consequential misconception this chapter addresses is the one where an engineer sees "NP-hard" and stops working on the problem. The classification does not support that response.
+
+NP-hardness is a worst-case statement. It says: on the hardest instances of this problem, no polynomial-time algorithm exists (assuming P ≠ NP). It does not say that your instances are the hardest. It does not say that exponential algorithms are useless in practice. It does not say that approximations do not exist. It does not say anything about undecidability — NP-hard problems are decidable with finite computation; the halting problem is not, and these are categorically different.
+
+Modern SAT solvers processing millions of clauses are exponential-worst-case algorithms performing polynomial-time in practice. ILP solvers handling real scheduling, logistics, and chip-design instances are solving NP-hard problems. Approximation algorithms with 1.5-approximation ratios for metric TSP are running on delivery routing problems every day. The theory tells you what is not available — a guaranteed polynomial-time exact algorithm — and leaves open an enormous space of alternatives.
+
+The corrective: when a problem is NP-hard, work through the seven alternatives. Almost always, at least one fits. The action is to engage, not to retreat.
+
+---
 
 ## Decision rules
 
 | Situation | Approach |
-| --- | --- |
-| Problem looks hard; want to confirm | Reduce a known NP-hard problem to it |
-| Confirmed NP-hard, n small (≤ 30) | Exact exponential (Held-Karp, branch-and-bound) |
+|---|---|
+| Problem looks hard; want to confirm | Reduce from a known NP-hard problem to yours |
+| Confirmed NP-hard, n small (≤ 25–30) | Exact exponential (Held-Karp, branch-and-bound) |
 | Confirmed NP-hard, structured instance | SAT solver or ILP solver |
-| Confirmed NP-hard, want bounded-quality solution | Approximation (Chapter 11) |
-| Confirmed NP-hard, want best practical solution, no guarantee | Heuristic (local search, simulated annealing) |
+| Confirmed NP-hard, want bounded-quality solution | Approximation algorithm (Chapter 11) |
+| Confirmed NP-hard, want best practical solution | Heuristic (local search, simulated annealing) |
 | Confirmed NP-hard, real instances on a special class | Special-case algorithm |
-| Confirmed NP-hard, parameterized in some `k` | FPT algorithm |
-| Suspected NP-hard but not yet proven | Look for known reduction; if none, attempt one from 3-SAT |
-| Looks NP-hard but might not be | Check for matching, flow, DP, LP structure first |
+| Confirmed NP-hard, small natural parameter k | FPT algorithm |
+| Looks NP-hard but not yet proven | Attempt reduction from 3-SAT; check flow/DP/LP first |
 
-## Worked example — course scheduling reduced to graph coloring
-
-A university must assign courses to time slots such that no student is enrolled in two courses scheduled at the same time. Each course has a list of enrolled students. The question: what is the minimum number of time slots needed?
-
-**Reduction to graph coloring.**
-
-Build a graph `G`. Each vertex is a course. Add an edge between two courses if they share at least one student. The minimum number of time slots equals the chromatic number of `G` — the minimum number of colors needed to color vertices such that adjacent vertices have different colors.
-
-Why? A valid schedule assigns each course to a time slot. Courses sharing a student cannot share a time slot, so adjacent vertices (in `G`) must get different colors (time slots). Conversely, any valid coloring of `G` is a valid schedule.
-
-**Hardness.** Graph coloring with `k ≥ 3` colors is NP-hard. Course scheduling inherits the hardness via the reduction. There is no known polynomial-time algorithm for the general problem.
-
-**What real universities actually do.**
-
-*Heuristic-driven.* Saturation degree (DSATUR) and recursive largest-first (RLF) heuristics produce schedules that are usually feasible and near-optimal on real registration data [verify]. The "real" structure — student enrollments cluster by department, by year, by program — produces graphs with low chromatic number relative to vertex count, far from worst-case.
-
-*Partial-instance.* Universities do not solve the global problem from scratch each term. They start from last term's schedule, modify for new courses and changed enrollments, and re-solve only the affected subproblem. Incrementality reduces effective instance size by an order of magnitude or more.
-
-*Iteration.* The first generated schedule has conflicts (a faculty member assigned to two simultaneous courses, a room used twice, accessibility constraint violated). The schedule is shown to a human scheduler, who edits and re-runs. The algorithm is a partner, not a black box. After a few iterations, an acceptable schedule emerges.
-
-*ILP encoding for hard cases.* When constraints are complex (faculty preferences, room features, accessibility, exam window constraints), the problem is encoded as an integer linear program and solved by Gurobi or CPLEX. Modern ILP solvers handle real university scheduling instances in minutes to hours [verify].
-
-*Soft constraints.* Real schedules tolerate some conflicts as soft penalties rather than hard constraints. The optimization minimizes a weighted penalty rather than enforcing zero conflicts.
-
-The lesson: the reduction proves the worst case is hard. The practice is far from worst case. Real NP-hard problems are routinely solved by combining structure exploitation, incrementality, heuristics, and modern solvers. "NP-hard" is a starting point for engineering, not a stopping point.
-
-## Failure modes — when "NP-complete means impossible" misleads
-
-The misconception engaged: "NP-complete means impossible."
-
-This is the most consequential misconception in this chapter. Three specific failures.
-
-**Refusing to attempt an NP-hard problem.** A practitioner sees "NP-complete" and abandons the problem. Real NP-hard problems are routinely solved on real instances. The chapter's §6 is what to do; the misconception's response is "give up." The corrective: NP-hardness is a worst-case statement; the typical-case complexity may be polynomial in disguise.
-
-**Believing exponential algorithms are useless.** Modern SAT solvers process millions of clauses; ILP solvers handle problems that would have been infeasible decades ago; specialized exponential algorithms (Held-Karp, color-coding, kernelization) push the boundary. "Exponential" describes growth rate, not absolute slowness.
-
-**Conflating NP-hard with undecidable.** NP-hard problems are decidable (you can solve them with finite computation, just slowly). Undecidable problems (halting problem, first-order logic validity) cannot be solved at all by any algorithm. Missing the distinction leads to despair where engineering would suffice.
-
-**Overestimating worst-case relevance.** The worst-case bound describes the hardest instance. Real instances often cluster far from worst case. 3-SAT clauses generated uniformly at random are easy at most ratios and hard only near phase transitions. Real-world SAT instances from hardware verification, planning, or theorem proving have structure that solvers exploit. The worst case is a bound; it is not the prediction.
-
-**Underestimating reduction's power as a tool.** Reduction is a positive technique, not just a negative one. Modeling your problem as SAT, ILP, MAX-SAT, or constraint satisfaction lets you use industrial-grade solvers for a problem you cannot solve by hand. The reduction is the engineering move, not just a hardness proof.
-
-The corrective heuristic: when a problem is NP-hard, ask which of the seven options in §6 fits. Almost always at least one does. The action is to engage, not to retreat.
-
-## Cross-references
-
-For approximation algorithms with provable ratios on the problems named here, see Chapter 11. For randomized algorithms applied to hard problems, see Chapter 12. For LP relaxation and rounding as exact and approximate solution techniques, see Chapter 13. For DP-based exact-exponential algorithms (Held-Karp), see Chapter 8.
-
-## Companion-page handoffs
-
-Reduction catalog with full constructions for the canonical problems; SAT solver demo (MiniSAT or Glucose); phase-transition visualizations for 3-SAT; ILP encodings for course scheduling, vertex cover, TSP; FPT algorithm walkthroughs; special-case algorithm catalog. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-10.
+---
 
 ## What this chapter does not enable
 
-This chapter does not enable proving P ≠ NP. The Millennium Prize Problem remains open; if you find a proof, the remainder of this chapter becomes obsolete. The chapter also does not cover the polynomial hierarchy (PH), the relationship between NP and counting problems (#P), or the modern interactive proofs and PCP machinery; those live in computational complexity texts. Concrete-complexity questions (lower bounds for specific algorithm classes) are also out of scope.
+This chapter does not enable proving P ≠ NP — the Millennium Prize Problem remains open. It does not cover the polynomial hierarchy, counting complexity (#P), interactive proofs, probabilistically checkable proofs, or the PCP theorem; those belong in a computational complexity textbook. It also does not cover concrete lower bounds for specific algorithm models — circuit complexity, communication complexity — which are research-frontier questions independent of the P vs. NP question.
+
+---
 
 ## Capability statement
 
-You can now determine whether a problem is likely NP-hard via reduction, correctly distinguish NP-hard from NP-complete from in-P, choose among the seven strategies for NP-hard problems (exact exponential, approximation, heuristic, special case, FPT, SAT/ILP encoding, phase-transition awareness), and recognize when an "intractable" problem is actually solvable on the instances you care about. The next time a problem looks hard, you can identify whether the hardness is real and what to do about it.
+You can now determine whether a problem is likely NP-hard via reduction, correctly distinguish P from NP from NP-complete from NP-hard, choose among the seven strategies for NP-hard problems in practice, and recognize when a problem that looks intractable is actually solvable on the instances you care about. The next time a problem looks hard, you can identify whether the hardness is real, what kind of hardness it is, and what to do about it.
 
+---
+
+## Exercises
+
+**Warm-up**
+
+1. Define each of the four complexity classes — P, NP, NP-hard, NP-complete — in your own words, using the verification intuition rather than the nondeterministic machine definition. For each class, give one canonical example and explain why it belongs there. *(Tests: understanding the four classes as distinct concepts with different membership criteria.)*
+
+2. Vertex cover and independent set are described as complementary. Prove this formally: given a graph G with n vertices, show that a set S is a vertex cover if and only if its complement V \\ S is an independent set. What does this complementarity imply about the hardness of independent set, given that vertex cover is NP-hard? *(Tests: working through a concrete hardness-by-complementarity argument.)*
+
+3. The chapter states that 2-SAT is solvable in linear time but 3-SAT is NP-hard, and that graph 2-coloring is polynomial but graph 3-coloring is NP-hard. What structural property do the polynomial-time versions have that the NP-hard versions lack? Describe in one paragraph what changes when you add the third option (third color, third literal per clause) that makes the problem hard. *(Tests: understanding tractability boundaries as structural differences, not just arbitrary facts.)*
+
+**Application**
+
+4. A company wants to assign employees to project teams such that no two employees with a known conflict of interest appear on the same team. Formalize this as a graph problem, identify which canonical NP-hard problem it reduces to, and state the reduction explicitly. Then identify at least two conditions on the input that would make the problem polynomial-time solvable. *(Tests: constructing a reduction from a real-world problem to a canonical NP-hard problem; identifying tractable special cases.)*
+
+5. You are given the following NP-hard problem: schedule n jobs on m identical machines to minimize the makespan (the time at which all jobs finish). For each of the seven strategies in the "What to do about it" section, state whether it applies to this problem and if so, what it would produce. You do not need to implement anything — reason about which strategies are viable given what you know about scheduling. *(Tests: applying the seven-strategy framework to a new NP-hard problem.)*
+
+6. The chapter says that 3-SAT near a clause-to-variable ratio of approximately 4.26 is the hard region, while instances far from this ratio are easy. Explain why an instance with ratio well below 4.26 is easy (hint: think about what happens to satisfiability probability) and why an instance with ratio well above 4.26 is also easy (hint: think about what a solver can do quickly). What does this imply for the relevance of worst-case NP-hardness to real-world 3-SAT instances used in circuit verification or planning? *(Tests: understanding the phase transition as a distribution over instances, not a universal statement about difficulty.)*
+
+**Synthesis**
+
+7. Cook's theorem proves SAT is NP-complete by showing every problem in NP reduces to SAT in polynomial time. Informally, what does the reduction do? Without reproducing the full technical proof, explain the key idea: what structure does a polynomial-time algorithm have that can be encoded as a Boolean formula? Why does this encoding always produce a formula of polynomial size? *(Tests: understanding the conceptual argument of Cook's theorem, not just its conclusion.)*
+
+8. The chapter distinguishes NP-hard (at least as hard as NP) from undecidable (not solvable at all). Give an example of an NP-hard problem and an undecidable problem. For each, describe what happens when you run an algorithm on it for a long time — what does the algorithm eventually do in the NP-hard case versus the undecidable case? Why does this distinction matter for engineering practice? *(Tests: understanding decidability vs. polynomial-time tractability as genuinely different concepts.)*
+
+**Challenge**
+
+9. Suppose you have a new problem Q that you suspect is NP-hard. You try to reduce 3-SAT to Q but cannot find a valid reduction after several attempts. Does this mean Q is in P? Does it mean Q is not NP-hard? What are the two possible explanations for failing to find a reduction, and how would you distinguish between them? Design a research strategy — a sequence of things to try — that would help you determine whether Q is in P or NP-hard when the standard reduction approach has failed. *(Tests: understanding reduction as an investigative tool with failure modes; reasoning about the boundary between P and NP-complete when the answer is unclear.)*
 
 ---
 
