@@ -1,212 +1,215 @@
-# Linear Programming
+# Chapter 13 — Linear Programming
 
-## TL;DR
+*The most powerful tool you are not using is the one that has been running the world's supply chains since 1947.*
 
-Linear programming (LP) is the optimization of a linear objective subject to linear constraints. Reach for this chapter when a problem can be modeled with continuous decision variables, linear costs, and linear feasibility — and many real problems can be. After consulting it, you can formulate an LP, choose between simplex and interior-point solvers, interpret the dual, distinguish LP from IP / MIP / QP, and recognize when LP relaxation provides a useful approximation to a harder integer problem.
+---
 
-## Recognition pattern
+In 1947, the United States Air Force asked George Dantzig to solve a planning problem. They needed to distribute men, equipment, and supplies across a theater of operations under constraints on what could move where, when, and at what cost. The problem had hundreds of variables and hundreds of constraints. No computational device of the era could enumerate the possibilities. Dantzig invented the simplex algorithm and solved it.
 
-The signal: a problem with quantitative decisions, costs that scale linearly with the decisions, and constraints that are inequalities or equalities in those decisions. How much of each product to make, given limited capacity. How to allocate flow across a network, given edge capacities. How to blend ingredients to minimize cost while meeting nutritional requirements. How to schedule resources to maximize value within budgets. The shape: maximize or minimize `cᵀx` subject to `Ax ≤ b`, `x ≥ 0`.
+Within a decade, oil refineries were using LP to optimize their production schedules. Within two decades, airline companies were using it to schedule crews. Today the power grid you depend on is re-optimized by an LP solver every few minutes. Every major airline uses LP to plan routes, crew assignments, and maintenance windows. The supply chains of global retailers are integer programs built on LP relaxations. The portfolio weights in many financial instruments are LP solutions. If you have used a logistics service, flown commercially, or turned on a light, you have already benefited from LP running somewhere upstream.
 
-A second signal: the problem has *duality structure*. Every LP has a dual LP whose optimal value matches the primal's. The dual variables have economic meaning — shadow prices, marginal values of constraints. When the optimal solution and its dual are both available, you understand not just the answer but its sensitivity.
+The misconception this chapter engages — "LP is for academics; production systems use heuristics" — is one of the most consequential mismatches between theory and practice in all of engineering. This chapter closes that gap.
 
-A third signal: a problem that is NP-hard as an *integer* program may be tractable as a *linear* program. The LP relaxation drops integrality constraints; the resulting LP is polynomial-time solvable; the LP optimum is a bound on the IP optimum, and rounding the fractional LP solution gives an approximation algorithm (Chapter 11).
+---
 
-A signal LP is *not* the right tool: the objective or constraints are non-linear (quadratic programming, second-order cone programming, semidefinite programming, general convex optimization). Or: the decisions are discrete and integrality matters fundamentally (integer programming, NP-hard in general). Or: the problem has stochastic elements that LP cannot encode without losing the linear structure.
+## What the problem looks like
 
-The misconception engaged in §10 is the one that keeps practitioners from reaching for LP at all: "LP is for academics; production systems use heuristics." This is wrong. LP solvers are foundational to operations research, supply chain, finance, energy, transportation, and increasingly to machine learning. The capability is industrial; the misconception is provincial.
+A linear program asks you to optimize a linear objective subject to linear constraints. The standard form is:
 
-## What you need to know first
+$$\text{maximize} \quad \mathbf{c}^\top \mathbf{x}$$
+$$\text{subject to} \quad A\mathbf{x} \leq \mathbf{b}, \quad \mathbf{x} \geq 0$$
 
-This chapter assumes Big O (Chapter 2) and basic linear algebra (vector dot products, matrix multiplication, systems of linear equations). For LP duality's relationship to max-flow min-cut, see Chapter 9 §3. For LP relaxation as approximation technique, see Chapter 11 §4. For the matroid-LP intersection that makes greedy optimal on certain problems, see Chapter 6 §5.
+where $\mathbf{x} \in \mathbb{R}^n$ is the vector of decision variables, $\mathbf{c} \in \mathbb{R}^n$ holds the objective coefficients, $A \in \mathbb{R}^{m \times n}$ is the constraint matrix, and $\mathbf{b} \in \mathbb{R}^m$ is the right-hand side.
 
-## The standard form
+The geometry is clean. Each constraint $\mathbf{a}_i^\top \mathbf{x} \leq b_i$ defines a half-space. Their intersection is a polyhedron — the feasible region. The objective $\mathbf{c}^\top \mathbf{x}$ is linear, so its level sets are parallel hyperplanes. To maximize the objective, you push the hyperplane as far as possible in the direction of $\mathbf{c}$ while staying inside the polyhedron. The maximum, when it exists and is bounded, is achieved at a vertex of the polyhedron.
 
-A linear program in standard form:
+This geometric fact is what makes LP tractable. The feasible region might have infinitely many points, but only finitely many vertices, and the optimum is at one of them.
 
-```
-maximize    cᵀx
-subject to  Ax ≤ b
-            x ≥ 0
-```
+Three outcomes are possible. The LP has a unique optimum at a vertex. Or it has multiple optima — an entire face of the polyhedron achieves the same objective value. Or it has no finite optimum, either because no $\mathbf{x}$ satisfies the constraints (infeasible) or because the objective grows without bound in the feasible direction (unbounded).
 
-where `x ∈ ℝⁿ` is the vector of decision variables, `c ∈ ℝⁿ` the objective coefficients, `A ∈ ℝᵐˣⁿ` the constraint matrix, `b ∈ ℝᵐ` the right-hand side.
+<!-- → [IMAGE: 2D LP geometry diagram — a feasible polyhedron (shaded polygon) with two constraints visible as boundary lines, the objective gradient vector c shown, level-set hyperplanes (parallel lines) pushed to the vertex that achieves the maximum, labeled "optimal vertex"; student sees the geometric argument that the optimum lives at a vertex] -->
 
-Variants:
+---
 
-- **Minimization:** `min cᵀx` is equivalent to `max -cᵀx`.
-- **Equality constraints:** `Ax = b` can be encoded as `Ax ≤ b` and `Ax ≥ b`.
-- **Free variables:** `x ∈ ℝ` (no sign constraint) can be encoded as `x = x⁺ - x⁻` with `x⁺, x⁻ ≥ 0`.
-- **Bounded variables:** `l ≤ x ≤ u` with explicit bounds is supported directly by most solvers.
+## The recognition pattern
 
-LP solvers accept all these variants natively; the standard form is for analysis, not for input.
+The signal that LP is the right tool is a combination of three things: decisions that are continuous quantities, costs and benefits that scale linearly with the decisions, and constraints that are linear inequalities or equalities.
 
-The **feasible region** — the set of `x` satisfying all constraints — is a polyhedron (intersection of half-spaces). The objective `cᵀx` is linear, so its level sets are hyperplanes. The optimum, when it exists and is bounded, is achieved at a vertex of the polyhedron. This geometric fact is what makes the simplex algorithm work.
+How much of each product to manufacture, given limited machine time and material. How to route flow across a network, given edge capacities. How to blend ingredients to minimize cost while meeting nutritional requirements. How to allocate a budget across advertising channels with diminishing-returns thresholds that can be linearized. The shape is always: maximize or minimize $\mathbf{c}^\top \mathbf{x}$ subject to $A\mathbf{x} \leq \mathbf{b}$.
 
-Three possible outcomes for an LP: a unique optimum (vertex), multiple optima (a whole face of the polyhedron achieves the optimum), or no finite optimum (infeasible: no `x` satisfies the constraints; or unbounded: the objective grows without bound).
+A second signal is when you need not just the optimal solution but the marginal value of your constraints. Every LP has a dual LP, and the dual variables quantify exactly this: how much does the optimal objective change per unit of relaxation in each constraint? If you are planning production and want to know which piece of equipment is worth upgrading, the LP dual tells you that, in dollars, without requiring a separate analysis.
 
-## The simplex algorithm
+A third signal is when you have a problem that is NP-hard as an integer program but tractable as a relaxation. Drop the integrality requirements, solve the LP in polynomial time, and you get a lower bound on the integer optimum. Round the fractional solution to get an approximation. Chapter 11 develops this into a systematic technique; LP is its engine.
 
-Dantzig 1947 [verify]. The original LP algorithm and still the production workhorse for many problem classes.
+What LP is not: when constraints or objectives are non-linear (quadratic, non-convex), when decisions are inherently discrete and the fractional relaxation is meaningless, when stochastic elements cannot be encoded without destroying linearity. Those require LP's relatives — quadratic programming, integer programming, stochastic LP — not LP itself.
 
-**Geometric idea.** The optimum lies at a vertex. Start at any feasible vertex; move along an edge of the polyhedron in a direction that improves the objective; arrive at a neighboring vertex. Repeat until no improving direction exists. The vertex you stop at is optimal.
+---
 
-**Algorithmic idea.** Maintain a *basis* — a set of `m` of the `n` variables held at non-zero values, with the rest at their bounds. The basis defines a vertex. A *pivot operation* swaps one basic variable for one non-basic variable, moving to a neighboring vertex.
+## Simplex: the algorithm that finds the vertex
 
-**Worst case is exponential.** Klee-Minty 1972 [verify] constructed instances where simplex visits exponentially many vertices. In practice, simplex is fast: on real-world instances, the number of pivots is typically `O(m + n)` or so. Smoothed analysis (Spielman and Teng 2001) [verify] explains this gap — under small random perturbations, simplex runs in expected polynomial time.
+Dantzig's simplex algorithm does not search all feasible points. It searches only vertices, and it moves between adjacent vertices in a direction that improves the objective.
 
-**Pivoting rules.** Several strategies for choosing the next pivot: Dantzig's rule (most-negative reduced cost), Bland's rule (lexicographically smallest index, prevents cycling), steepest-edge (best objective improvement per unit step). Modern solvers use sophisticated rules tuned to instance type.
+A vertex is defined by which constraints are active — binding at equality. A set of $m$ active constraints gives a system of $m$ equations in $n$ unknowns; when the system has a unique solution, that solution is a vertex. The simplex algorithm maintains a *basis* — a set of $m$ variables held at positive values, with the remaining $n - m$ at zero — which defines the current vertex. A *pivot* swaps one basis variable for one non-basis variable, moving to an adjacent vertex.
 
-**Production performance.** Commercial simplex implementations (Gurobi, CPLEX, FICO Xpress) handle LPs with millions of variables and constraints [verify]. The combination of decades of pivoting rule research, sparse linear algebra, and presolve techniques makes simplex effective on a vast range of practical problems.
+The stopping condition is elegant. At each vertex, compute the *reduced costs* — the rate at which the objective improves if each non-basic variable is increased from zero. When all reduced costs are non-positive, no move can improve the objective, and the current vertex is optimal. The optimality certificate is local and global simultaneously: if no neighboring vertex is better, no vertex anywhere is better.
 
-## Interior-point methods
+Worst-case, simplex can visit exponentially many vertices. Klee and Minty constructed a family of LPs — the Klee-Minty cube — where simplex with Dantzig's pivoting rule visits every vertex. In practice, this never happens on real problems. Spielman and Teng's smoothed analysis (2001) showed that under small random perturbations, simplex runs in expected polynomial time, which explains what practitioners already knew: on real-world instances, the number of pivots is typically proportional to the number of constraints, not exponential in it.
 
-Karmarkar 1984 [verify] gave the first polynomial-time interior-point algorithm that was competitive with simplex in practice. Earlier polynomial-time algorithm (the ellipsoid method, Khachiyan 1979) was a theoretical breakthrough but practically slow.
+Modern simplex implementations in Gurobi, CPLEX, and FICO Xpress handle LPs with millions of variables and constraints. They exploit sparse linear algebra — most real-world constraint matrices are very sparse — presolve techniques that simplify the problem before solving, and sophisticated pivot rules that exploit problem structure. The gap between textbook simplex and production simplex is decades of engineering.
 
-**Geometric idea.** Move through the interior of the feasible region toward the optimum, rather than along the boundary as simplex does. Each iteration takes a Newton-method-like step on a perturbed objective.
+---
 
-**Algorithmic idea.** Replace the constraints with a barrier function that is finite inside the feasible region and goes to infinity at the boundary. Solve the barrier problem with Newton's method. Decrease the barrier strength to zero, tracking the optimum.
+## Interior-point methods: the polynomial-time alternative
 
-**Performance properties.** Polynomial-time worst case: `O((m + n)^(3/2) · log(1/ε))` iterations to ε-accuracy with appropriate analysis [verify]. In practice, interior-point methods take a relatively small constant number of iterations (~20–50) regardless of problem size, with each iteration costing a sparse linear system solve. They scale better than simplex on very large LPs (millions of variables); simplex retains an edge on warm-starting (re-solving after a small change).
+In 1984, Narendra Karmarkar published an interior-point algorithm for LP that was both polynomial-time and practically competitive with simplex. The geometric idea is different: instead of walking along the boundary of the feasible polyhedron, move through its interior, approaching the optimal vertex from inside.
 
-**Production rule of thumb.** For one-shot solves of large LPs, prefer interior-point. For repeated solves where each is a small modification of the last (branch-and-bound, sensitivity analysis, parametric programming), prefer simplex. Modern solvers run both and pick automatically.
+The mathematical mechanism is a *barrier function* — a function that is finite inside the feasible region and goes to infinity at the boundary. The barrier function is added to the objective, penalizing proximity to the constraints. The modified problem is solved with Newton's method, a step that finds the locally optimal direction in a single matrix inversion. Then the barrier strength is reduced, the Newton step is repeated, and the process tracks the optimal vertex from the interior.
 
-## Duality
+Interior-point methods are polynomial-time with precise guarantees — roughly $O((m+n)^{3/2} \log(1/\varepsilon))$ iterations to $\varepsilon$-accuracy on appropriate problem classes. In practice, they take a small constant number of iterations — typically 20 to 50 — regardless of problem size, with each iteration requiring a sparse linear system solve. They scale well on very large LPs where simplex's iteration count would be prohibitive.
 
-Every LP has a *dual* LP. The dual of
+The practical trade-off between simplex and interior-point is warm-starting. Simplex can restart cheaply from the optimal basis of a previous solve when the problem changes slightly: change a right-hand side by a small amount, and simplex needs only a few more pivots from the old optimal vertex to the new one. Interior-point cannot do this — it starts from the interior every time. For branch-and-bound algorithms, which solve thousands of LP relaxations that differ from each other by small amounts, simplex dominates. For one-shot large LP solves, interior-point often wins.
 
-```
-max cᵀx subject to Ax ≤ b, x ≥ 0
-```
+Modern solvers run both and choose automatically.
+
+<!-- → [INFOGRAPHIC: two-panel diagram contrasting simplex (path along the polyhedron boundary, vertex to vertex) and interior-point (curved path through the interior converging to the optimal vertex) — same feasible region, same optimal vertex, visibly different trajectories; student sees why interior-point loses the warm-start advantage] -->
+
+---
+
+## Duality: the answer inside the answer
+
+Every LP has a dual LP, and the duality relationship is one of the deepest results in optimization. The dual of the standard-form LP
+
+$$\text{maximize} \quad \mathbf{c}^\top \mathbf{x} \quad \text{subject to} \quad A\mathbf{x} \leq \mathbf{b}, \quad \mathbf{x} \geq 0$$
 
 is
 
-```
-min bᵀy subject to Aᵀy ≥ c, y ≥ 0.
-```
+$$\text{minimize} \quad \mathbf{b}^\top \mathbf{y} \quad \text{subject to} \quad A^\top \mathbf{y} \geq \mathbf{c}, \quad \mathbf{y} \geq 0$$
 
-**Strong duality theorem.** If the primal has an optimal solution, so does the dual, and the optimal values are equal: `cᵀx* = bᵀy*`. The dual variables `y_i` have an economic interpretation — they are the *shadow prices* or *marginal values* of the primal constraints. `y_i` is the rate of increase in the optimal objective per unit of relaxation in the `i`-th constraint.
+The **strong duality theorem** says that if the primal has an optimal solution, so does the dual, and the optimal values are equal: $\mathbf{c}^\top \mathbf{x}^* = \mathbf{b}^\top \mathbf{y}^*$. The primal's maximum equals the dual's minimum.
 
-**Complementary slackness.** At optimum, for each constraint either the constraint is tight (binding) or its dual variable is zero. Equivalently: a slack constraint costs nothing to relax further; a binding constraint has a positive shadow price.
+The dual variables $y_i$ have a direct economic interpretation. They are the *shadow prices* of the primal constraints — the rate of change in the optimal objective per unit increase in the right-hand side $b_i$. If constraint $i$ says "machine capacity is at most 1000 hours" and its shadow price is $\$5$/hour, then relaxing that constraint to 1001 hours increases the optimal profit by approximately $\$5$. Exactly $\$5$ for small changes; the linearity of LP makes this exact in a neighborhood of the optimum.
 
-**Why duality matters.**
+**Complementary slackness** is the optimality condition that captures this precisely. At the optimum, for each constraint either the constraint is binding (tight, used at full capacity) or its shadow price is zero. A constraint with slack — some capacity left unused — costs nothing to relax further, so its shadow price is zero. A binding constraint has a positive shadow price, measuring what would be gained by relaxing it.
 
-*Sensitivity analysis.* Want to know how much the optimum changes if a constraint's right-hand side changes by ε? The dual variable tells you the linear-order change. Critical for "what if" analysis on planning models.
+The shadow prices tell you things the primal solution does not. The primal tells you what to do. The dual tells you which constraints are holding you back and by how much. In production planning, shadow prices tell management which capacity constraints are worth expanding. In diet optimization, they tell you which nutritional requirements are binding and what each is costing. In network routing, they relate to the bottleneck edges — and this is exactly where Chapter 9's max-flow min-cut theorem lives: it is a special case of LP duality.
 
-*Bounds on integer programs.* The LP relaxation gives a bound on the IP optimum. The dual of the LP relaxation gives a *certificate* of that bound. Branch-and-bound algorithms use this duality every iteration.
+<!-- → [CHART: sensitivity analysis plot — x-axis: right-hand side perturbation of the binding constraint (±20%), y-axis: optimal objective value — a piecewise-linear curve with slope equal to the shadow price in the neighborhood of the original constraint, flattening outside the sensitivity range; student sees the shadow price as a slope and the sensitivity range as the domain over which it holds] -->
 
-*Reformulation.* Sometimes the dual is easier to solve than the primal. Network flow's max-flow min-cut (Chapter 9) is the canonical example: the max-flow primal and min-cut dual are linked by strong duality.
+---
 
-*Economic interpretation.* In production planning, the shadow prices tell management which capacities to expand and which are wasteful. The dual is not an algorithmic trick; it is the structural answer to "what is the marginal value of this resource?"
+## LP, IP, MIP, QP: where the boundaries are
 
-## LP, IP, MIP, QP — the family
+LP is one member of a family of optimization problems. The boundaries matter because crossing from LP into integer programming changes the computational complexity from polynomial to NP-hard.
 
-LP is one member of a family of optimization problems. Knowing where each lives is part of the recognition pattern.
+**LP** — linear objective, linear constraints, continuous variables — is polynomial-time solvable, as established by Khachiyan's ellipsoid method in 1979 and in practice by simplex and interior-point.
 
-**LP — Linear Programming.** Linear objective, linear constraints, continuous variables. Polynomial-time solvable.
+**IP (integer programming)** — the same setup with integer variables — is NP-hard. Adding integrality to a linear program changes the feasible region from a polyhedron to a discrete set of lattice points, and the optimum over lattice points can be far from the vertex of the LP relaxation.
 
-**IP — Integer Programming.** Linear objective, linear constraints, integer variables. NP-hard in general.
+**MIP (mixed-integer programming)** — some variables continuous, others integer — is also NP-hard and is the most common form in practice. Almost any real scheduling, routing, or assignment problem with both quantity decisions (continuous) and binary yes/no decisions (integer) is a MIP.
 
-**MIP — Mixed Integer Programming.** Some variables continuous, others integer. NP-hard. Solved by branch-and-bound combining LP relaxations with integer branching.
+**0-1 integer programming** — binary variables — is the standard formulation for combinatorial problems: is this edge in the cut (0 or 1), is this item in the knapsack (0 or 1), is this customer assigned to this facility (0 or 1). Chapter 10's NP-complete problems all have natural 0-1 IP formulations.
 
-**0-1 IP / Binary IP.** Variables restricted to 0 or 1. NP-hard but a standard formulation for combinatorial problems (set cover, vertex cover, knapsack, scheduling).
+**QP (quadratic programming)** — quadratic objective, linear constraints — is polynomial-time when convex (used in portfolio optimization and support vector machines) and NP-hard when non-convex.
 
-**QP — Quadratic Programming.** Quadratic objective, linear constraints. Convex QP is polynomial; non-convex QP is NP-hard. Used in finance (portfolio optimization with risk), control, machine learning (SVMs).
+The transition from LP to MIP is where most practitioners encounter the computational cliff. An LP with 10,000 variables solves in seconds. Adding even a few hundred binary variables creates a MIP where branch-and-bound searches exponentially many LP relaxations. MIP solvers (Gurobi, CPLEX) apply decades of techniques — cutting planes, presolve, heuristic branching — to make large MIPs tractable in practice despite the theoretical complexity.
 
-**SOCP — Second-Order Cone Programming.** Generalizes LP and convex QP. Polynomial-time. Used in robust optimization, antenna design, control.
+The LP relaxation — solving the MIP as an LP by dropping integrality constraints — is the core subroutine of branch-and-bound. Every node in the branch-and-bound tree solves an LP. The LP optimum is an upper bound (for maximization) on the true integer optimum. If the LP optimum happens to be integral, it is the optimal integer solution. If it is fractional, the algorithm branches on a fractional variable, creating two subproblems. LP makes MIP solvable; without LP as the backbone, MIP solving would be hopeless.
 
-**SDP — Semidefinite Programming.** Generalizes SOCP. Polynomial-time. Used in approximation algorithms (Goemans-Williamson MAX-CUT 0.878-approximation, 1995) [verify].
+<!-- → [TABLE: optimization problem family — columns: problem class, objective type, variable type, complexity, canonical examples, typical solver — rows: LP, IP, MIP, 0-1 IP, QP (convex), QP (non-convex); student sees the full family at a glance and can locate their problem in the right row] -->
 
-**General convex programming.** Convex objective, convex feasible set. Polynomial-time given oracle access. The umbrella that contains LP, QP, SOCP, SDP, and others.
+---
 
-The transition from LP to IP is where the practitioner most often gets stuck. Many real problems are MIP, not LP, and the gap matters: MIP solvers can take orders of magnitude longer than LP solvers on the same number of variables.
+## Worked example: production planning at a refinery
+
+Oil refineries have used LP since the 1950s; the early applications drove commercial LP solver development. The problem is canonical.
+
+A refinery processes crude oil into finished products: gasoline, diesel, jet fuel, fuel oil, lubricants. Multiple crude types are available at different prices. Each crude can be processed by different distillation paths, each yielding different product ratios and subject to throughput constraints. Products must meet demand forecasts. The question: how much of each crude to run through each path, to maximize profit?
+
+The LP formulation is direct. Decision variables $x_{ij}$ represent the amount of crude $i$ processed on path $j$. The objective maximizes revenue from products minus cost of crude minus processing costs. Constraints enforce: throughput on each distillation path, availability of each crude type, and satisfaction of demand for each product. Non-negativity ensures no negative quantities.
+
+For a small refinery with 5 crude types, 8 processing paths, and 6 finished products, the LP has 40 variables and roughly 19 constraints — solved in milliseconds. Real refineries have hundreds of variables and constraints; solved in seconds.
+
+Solving gives the optimal production schedule. But the dual gives something additional.
+
+The shadow price on each capacity constraint says: if this distillation tower's capacity increases by one barrel per day, profit increases by $X$. That is the value of capital investment, computed without any additional analysis. The shadow price on each crude constraint says: this is the most we should pay above the market price for additional supply of this crude. The shadow price on each demand constraint says: this is what it costs, in reduced profit, to meet one more unit of demand.
+
+Sensitivity analysis extends this. What if jet fuel demand rises 10%? Solve the LP again with the right-hand side changed, or use the dual to estimate the change linearly. What if a unit goes offline for maintenance, cutting path capacity to zero for a week? Resolve with that constraint tightened. The LP framework supports rapid what-if analysis because the dual is already computed.
+
+The extensions that arise in practice are worth noting. Pooling problems — where intermediate streams are blended in tanks — introduce bilinear terms that make constraints non-linear. This breaks LP's polynomial-time guarantee and requires specialized solvers. Multi-period planning links periods by inventory constraints, creating a sequence of LPs. Integer decisions about starting or shutting down units create MIPs. The basic LP is tractable; the real-world extensions escalate toward MIP and non-linear programming, but LP is always in the backbone.
+
+---
+
+## The misconception about LP and its costs
+
+"LP is for academics; production systems use heuristics." This is factually wrong about industrial practice and carries a practical cost: problems that could be solved optimally in seconds are instead solved by ad-hoc methods with unknown solution quality and no sensitivity information.
+
+The industrial record is not ambiguous. Airline scheduling, refinery production, power-grid dispatch, supply-chain optimization, telecommunications network design, and financial portfolio construction are LP-driven at scale. The claim that production systems use heuristics instead of LP is true in the sense that some heuristics exist — and false in the sense that LP solvers run at industrial scale daily, on problems with millions of variables.
+
+The deeper misconception is about what LP provides that a heuristic does not. A heuristic gives you a solution with no guarantee on its distance from optimal and no information about which constraints are limiting you. An LP gives you the optimal solution (for the LP problem class), the shadow prices quantifying the marginal value of each constraint, and the sensitivity range over which that solution remains optimal. This is not academic; this is the information that capital investment decisions and contract negotiations are built on.
+
+The specific limits of LP are real and worth knowing. Non-linear constraints — pooling, blending, quadratic risk terms — break the LP structure and require QP, SOCP, or general convex programming. Integer requirements — scheduling discrete starts and stops, routing binary assignments — require IP. Uncertainty in the data requires stochastic or robust LP formulations. These are not reasons to avoid LP; they are reasons to know where LP ends and its relatives begin.
+
+The corrective: when a problem looks like quantitative allocation under linear costs and constraints, formulate the LP. If integrality is essential, escalate to MIP. If the objective is quadratic, escalate to QP. Start with LP; escalate when the structure demands it.
+
+---
 
 ## Decision rules
 
 | Problem signature | Approach |
-| --- | --- |
-| Linear objective, linear constraints, continuous variables | LP via simplex or interior-point |
-| Linear objective, linear constraints, integer variables | IP via branch-and-bound (NP-hard) |
-| Mix of continuous and integer | MIP solver (Gurobi, CPLEX, OR-Tools) |
-| Want shadow prices and sensitivity analysis | Solve LP and read the dual |
+|---|---|
+| Linear objective, linear constraints, continuous variables | LP: simplex or interior-point |
+| Need shadow prices and sensitivity | Solve LP and read the dual |
+| Linear constraints, integer variables | IP or MIP solver |
+| Mix of continuous and integer | MIP solver |
 | Need lower bound on IP optimum | LP relaxation |
-| Need approximation algorithm for NP-hard problem | LP relaxation + rounding (Chapter 11) |
-| Quadratic objective, linear constraints, convex | QP solver |
-| Network flow problem | Reduce to LP (Chapter 9) — but specialized solvers are faster |
+| Need approximation from NP-hard IP | LP relaxation + rounding (Chapter 11) |
+| Quadratic objective, convex, linear constraints | QP solver |
+| Network flow problem | Specialized network simplex — LP-equivalent, faster in practice |
 | Very large LP, one-shot | Interior-point |
-| Repeated LP solves with small modifications | Simplex (warm-starts well) |
-| Robust to data uncertainty needed | SOCP or robust LP formulation |
-| Approximation ratio via SDP | Specialized SDP solver |
-| Don't know if problem is LP-shaped | Try to write the constraints as `Ax ≤ b` |
+| Repeated LP solves, small modifications | Simplex (warm-starts well) |
+| Don't know if LP-shaped | Try writing constraints as $A\mathbf{x} \leq \mathbf{b}$; if they fit, solve as LP |
 
-## Worked example — production planning at a refinery
-
-A refinery processes crude oil into multiple finished products: gasoline, diesel, jet fuel, fuel oil, lubricants. Crude is purchased from suppliers at varying prices. Each unit of crude can be processed by several distillation paths producing different yield ratios. Each path has a capacity constraint (throughput, time, equipment availability). Demand for each product is forecast and must be met. The question: how much of each path to run on each crude type, to maximize profit subject to capacity and demand?
-
-This is one of the canonical LP applications. Refineries have used LP since the 1950s [verify]; the original applications drove much of the early commercial LP solver development.
-
-**Formulation.** Decision variables `x_{ij}` = amount of crude `i` processed by path `j`. Objective: `max Σ (revenue from products − cost of crude × quantity − processing costs)`. Constraints:
-
-- Capacity: total throughput on each path `≤ path's capacity`
-- Crude availability: total of each crude type `≤ supplier's offering`
-- Demand: total of each product produced `≥ demand forecast`
-- Non-negativity: `x_{ij} ≥ 0`
-
-For a refinery with 5 crude types, 8 processing paths, and 6 finished products, the LP has 40 decision variables and roughly 19 constraints — solvable in milliseconds by any modern solver. Real refineries have hundreds of variables and constraints; still solvable in seconds.
-
-**The optimum and the dual.** Solving gives the optimal production plan. The dual gives the shadow prices.
-
-- Shadow price on a capacity constraint: how much profit increases per unit of additional capacity. If a distillation tower's shadow price is $0.50 per barrel, expanding throughput by 10,000 barrels per day adds $5,000/day to profit (linear extrapolation, locally valid).
-- Shadow price on a crude constraint: the marginal value of one more barrel of that crude type. If the shadow price is $2 above the purchase price, the refinery would pay up to $2 more per barrel for incremental supply.
-- Shadow price on a demand constraint: the marginal cost of meeting one more unit of demand. If the price is high, the demand is expensive to meet — possibly an opportunity to negotiate price or shed demand.
-
-**Sensitivity analysis.** What if jet fuel demand jumps 10%? The LP can be re-solved or, for small changes, the dual gives a linear-order estimate. What if a refinery undergoes maintenance and one path's capacity drops to zero for a week? Re-solve with that constraint binding. The LP framework supports rapid scenario analysis.
-
-**Real refinery LPs include extensions.**
-
-- *Pooling problems* — when intermediate streams are blended in tanks, the constraints become non-linear (bilinear). These are non-convex and require specialized algorithms or approximation. Major source of difficulty in practice.
-- *Multi-period planning* — sequence of LPs across time, with inventory linking periods.
-- *Stochastic LP* — uncertainty in demand or prices, optimized over scenarios. Two-stage stochastic LPs are LPs themselves; multi-stage become harder.
-- *Integer constraints* — scheduling decisions (start a unit, shut down a unit, transition between modes) are 0/1 integers; the resulting MIP is harder than the LP.
-
-**Lessons.** The basic refinery LP is straightforward; the LP framework scales to real production planning at industrial scale. The dual gives information not present in the primal — sensitivity, marginal values, what-if analysis. The practitioner who can formulate the LP and read the dual unlocks both the optimum and its sensitivity in one solve.
-
-## Failure modes — when "LP is for academics" misleads
-
-The misconception engaged: "LP is for academics; production systems use heuristics."
-
-This is wrong about industrial reality, wrong about LP capability, and wrong about the trade-off heuristics actually make.
-
-**LP is industrial.** Airline scheduling, refinery production, power-grid dispatch, supply-chain optimization, telecommunications network design, financial portfolio optimization — all of these are LP-driven (or MIP-driven, with LP as the relaxation backbone) at scale. Major airlines solve LPs with millions of variables daily. The supply chain of a global retailer is an MIP. The power grid is an LP solved every few minutes. "LP is for academics" describes an audience the literature serves; it does not describe where LP runs.
-
-**Heuristics ≠ better-than-LP.** A heuristic without a guarantee may be faster on small instances. At scale, LP solvers benefit from decades of solver engineering — sparse linear algebra, presolve, cutting planes, dual simplex, parallel branch-and-bound. Heuristics that look good in textbooks may lose to LP-based methods on real workloads.
-
-**LP relaxation is the workhorse for NP-hard problems.** Approximation algorithms (Chapter 11) almost always use LP somewhere — relaxation, rounding, primal-dual, dual-fitting. Modern combinatorial optimization is unrecognizable without LP.
-
-**Solver progress is real and ongoing.** LP solvers have improved by orders of magnitude over the past 30 years, combining algorithmic advances (interior-point methods, presolve, primal-dual algorithms) with hardware (cache-friendly linear algebra, parallelism, vectorization). Problems considered infeasible a decade ago are now routine.
-
-**Degeneracy and numerical stability are real but managed.** LP can struggle with degeneracy (multiple optimal vertices), unbounded problems, numerical conditioning. Production solvers handle these via lexicographic perturbations, scaling, and careful arithmetic. The practitioner should know about these issues but does not usually need to engineer around them.
-
-**The genuine cases where LP is wrong.** Non-linear constraints (pooling, blending). Discrete decisions where integrality is essential (scheduling on/off, routing). Stochastic problems with deep recursion. These require LP's relatives (QP, MIP, stochastic programming), not LP itself. The misconception is "LP is rare"; the corrective is "LP is everywhere, and its limits are specific."
-
-The corrective heuristic: when a problem looks like quantitative resource allocation under linear costs and constraints, formulate the LP. Solve it. Read the dual. If integrality is essential, escalate to MIP. The LP-first move is the production move.
-
-## Cross-references
-
-For LP duality applied to network flow (max-flow min-cut), see Chapter 9 §3. For LP relaxation and rounding as approximation, see Chapter 11 §4. For matroid LPs and greedy optimality, see Chapter 6 §5. For randomized rounding in LP-based approximation, see Chapter 12. For NP-hardness of integer programming, see Chapter 10.
-
-## Companion-page handoffs
-
-Solver comparison (Gurobi, CPLEX, FICO Xpress, COIN-OR CBC, OR-Tools, SciPy linprog) on benchmark instances; modeling tutorials in Python (PuLP, CVXPY, Pyomo); refinery-LP case study with code; airline-scheduling MIP example; power-grid dispatch demonstration; sensitivity-analysis walkthrough; introduction to QP and SDP. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-13.
+---
 
 ## What this chapter does not enable
 
-This chapter does not enable implementing simplex or interior-point methods from scratch. Production solvers are decades of careful engineering; reimplementing them is not the right call for almost any practical problem. The chapter also does not cover advanced LP topics — column generation, Lagrangian relaxation, decomposition methods, parametric programming at depth. For those, consult Bertsimas and Tsitsiklis's *Introduction to Linear Optimization* or Vanderbei's *Linear Programming: Foundations and Extensions*. Stochastic and robust LP variants live in operations research literature; the LP relaxation chapter touches them but does not develop them.
+This chapter does not enable implementing simplex or interior-point from scratch. Production solvers represent decades of careful engineering; the right move is to use them, not to reinvent them. The chapter does not cover column generation, Lagrangian relaxation, or Benders decomposition — techniques for very large LPs and MIPs that decompose the problem into tractable subproblems. For those, consult Bertsimas and Tsitsiklis's *Introduction to Linear Optimization* or Wolsey's *Integer Programming*. Stochastic and robust LP formulations are touched here but developed in operations research literature.
+
+---
 
 ## Capability statement
 
-You can now formulate a problem with linear constraints and a linear objective as an LP; choose between simplex (warm-starts well, classical workhorse) and interior-point (better on large one-shot solves); interpret the dual as shadow prices and use it for sensitivity analysis; distinguish LP from IP / MIP / QP and know which solver each requires; recognize when LP relaxation provides an approximation bound for an NP-hard problem; and avoid the misconception that LP is academic rather than industrial. The next time a problem arrives that looks like quantitative allocation under linear constraints — refinery, airline, supply chain, portfolio, network — the path from problem to LP to solution is in your hands. This chapter closes the optimization arc the volume opened with.
+You can now formulate a problem with a linear objective and linear constraints as an LP in standard form; choose between simplex and interior-point based on whether the problem benefits from warm-starting; read the dual solution as shadow prices and use them for sensitivity analysis; distinguish LP from IP, MIP, and QP and know which solver each requires; and recognize when LP relaxation provides an approximation bound or serves as the backbone of a branch-and-bound algorithm. The next time a problem arrives that looks like quantitative allocation under linear constraints — refinery, airline, supply chain, portfolio, power grid — the path from problem to LP to optimal solution and its sensitivity is in your hands. This chapter closes the optimization arc the volume opened with.
 
+---
+
+## Exercises
+
+**Warm-up**
+
+1. A company makes two products. Product A requires 3 hours of machine time and 2 kg of material per unit; product B requires 1 hour of machine time and 4 kg of material per unit. The machine is available for 120 hours per week; 200 kg of material is available. Product A sells for $5/unit and product B for $4/unit. Write this as a linear program in standard form — define the decision variables, write the objective, write the constraints. Do not solve it; just formulate it. *(Tests: converting a verbal description to standard LP form.)*
+
+2. The simplex algorithm stops when all reduced costs are non-positive. Explain in geometric terms what a negative reduced cost means (what does it tell you about a neighboring vertex?) and why all non-positive reduced costs certifies global optimality, not just local. *(Tests: understanding the simplex stopping condition as a global certificate, not a local one.)*
+
+3. Strong duality says the primal maximum equals the dual minimum. Complementary slackness says: at optimum, a constraint is either binding or its shadow price is zero. Give an intuitive explanation of why a slack constraint must have shadow price zero. What would it mean economically if a constraint with surplus capacity had a positive shadow price? *(Tests: understanding complementary slackness as an economic statement, not just an algebraic one.)*
+
+**Application**
+
+4. You solve a production-planning LP and find that the binding constraints are machine-hours (shadow price $4.50/hour) and raw material (shadow price $0). The material constraint has 30 units of slack. Management asks: "Should we invest in more machine capacity or more raw material?" Use the shadow prices to answer this question, and explain what the zero shadow price on raw material tells you about the current plan. *(Tests: reading dual variables as managerial information, not just algorithmic output.)*
+
+5. A network flow problem (Chapter 9) can be formulated as an LP: decision variables are flow on each edge, the objective minimizes cost, and constraints enforce capacity and conservation. Write the LP formulation for a small network with 3 nodes and 4 edges (you may invent the numbers). Then identify which LP variables correspond to which edges and what the dual variables would represent physically. *(Tests: translating between a combinatorial problem and its LP formulation; connecting LP duality to Chapter 9.)*
+
+6. The LP relaxation of the minimum vertex-cover integer program allows vertex variables to take fractional values between 0 and 1. If the LP relaxation returns a fractional solution, explain why rounding every value ≥ 0.5 up to 1 produces a valid integer solution. Then argue why this rounded solution is at most twice the size of the optimal integer solution. (This is the 2-approximation guarantee from Chapter 11 derived through LP.) *(Tests: connecting LP relaxation to approximation algorithm analysis.)*
+
+**Synthesis**
+
+7. Simplex has exponential worst-case complexity but is fast in practice. Interior-point has polynomial worst-case complexity but loses to simplex on warm-started re-solves. A branch-and-bound MIP solver solves thousands of LP relaxations, each slightly different from the last. Which algorithm should the MIP solver use for its LP subproblems, and why? What property of simplex makes it the right choice even though it has worse theoretical guarantees? *(Tests: applying the simplex/interior-point trade-off to a concrete algorithmic context.)*
+
+8. A colleague says: "Our scheduling problem has 50 jobs, 5 machines, and binary assignment variables — it's an NP-hard MIP. We should use a heuristic." Walk through the argument for trying LP relaxation first: what does it give you that the heuristic does not, what is the LP relaxation of this specific problem, and under what conditions would the LP relaxation solution be usable directly without branch-and-bound? *(Tests: applying the LP-first principle to a real NP-hard problem; understanding when LP relaxation is sufficient.)*
+
+**Challenge**
+
+9. The chapter says LP duality is the general framework behind max-flow min-cut (Chapter 9). Sketch the argument: write the max-flow LP (objective: maximize total flow; constraints: edge capacities, flow conservation), write its dual, and identify which dual variables correspond to which edges and cuts. You do not need to derive the full duality proof — state the correspondence and explain why the dual of the max-flow LP should give you the min-cut value, given strong duality. *(Tests: connecting LP duality to a specific Chapter 9 result; reasoning across the book's optimization arc.)*
 
 ---
 
