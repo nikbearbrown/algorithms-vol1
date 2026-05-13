@@ -1,172 +1,258 @@
-# Approximation Algorithms
+# Chapter 11 — Approximation Algorithms
 
-## TL;DR
+*What it means to be provably close to the right answer.*
 
-An approximation algorithm runs in polynomial time and returns a solution with a provable bound on quality — typically a multiplicative ratio relative to optimal. Reach for this chapter when a problem is NP-hard (Chapter 10) but you need a polynomial-time algorithm with a guarantee. After consulting it, you can identify the canonical approximation algorithms, distinguish constant-factor / PTAS / FPTAS / inapproximable problems, and correctly interpret what an approximation ratio does and does not promise.
+---
 
-## Recognition pattern
+Here is a problem that sounds straightforward until you try to solve it. A city water utility wants to place sensors in its distribution network so that every junction is monitored — contamination anywhere should be detectable before it reaches consumers. There are thousands of candidate sensor locations. Each location, if installed, covers a known set of downstream junctions. The utility wants the minimum number of sensors that together cover every junction.
 
-The signal: you have an NP-hard problem (Chapter 10) and you need a polynomial-time algorithm with a quality guarantee. Heuristics give no guarantee. Exact algorithms give the right answer but exponential time. Approximation sits in between — polynomial time, bounded quality.
+This is the set cover problem. It is NP-hard. Exact algorithms take exponential time. The network has thousands of junctions and the utility needs an answer in minutes, not years.
 
-Three concrete signs an approximation algorithm is the right tool.
+The classical response to this situation is a heuristic: use engineering judgment, try a few configurations, pick the best one. Heuristics are reasonable, and for many problems they perform well in practice. But they offer no guarantee. The solution they find might be near optimal, or it might be twice as large as necessary, and there is no way to know which without solving the problem exactly — which you just admitted you cannot do.
 
-*The problem is NP-hard but admits structural relaxation.* Many NP-hard problems become tractable when "find the optimum" is relaxed to "find within a factor of optimum." Vertex cover, set cover, metric TSP, knapsack, bin packing — all admit polynomial-time approximations with known ratios.
+There is a middle ground. An approximation algorithm runs in polynomial time and returns a solution whose quality is provably bounded relative to optimal. Not "usually good." *Provably bounded*, on every instance. That is the contract this chapter is about.
 
-*You need a guarantee, not just an answer.* A heuristic might give a great answer on your data; you cannot prove it. An approximation gives a provably-bounded answer on every input. The guarantee matters when the algorithm is making consequential decisions and "usually fine" is not enough.
+---
 
-*You need bounded suboptimality across instance variation.* Real workloads vary. A heuristic that is great on benchmark A and terrible on benchmark B is a deployment risk. An approximation with ratio `α` produces a solution within `α · OPT` on *every* instance — adversarial, average, or yours.
+## The Contract
 
-A signal approximation is *not* the right tool: the problem admits a polynomial-time exact algorithm and you missed it. Check Chapter 6 (greedy), Chapter 7 (D&C), Chapter 8 (DP), Chapter 9 (flow), Chapter 13 (LP) before declaring NP-hardness.
+An approximation algorithm comes with a ratio — a number `α ≥ 1` — that defines the worst-case quality guarantee.
 
-The misconception engaged in §8 is the one practitioners actually fall into: misreading what the ratio says about a *specific instance*. The ratio is a worst-case bound over all instances; on your specific instance, the algorithm may do much better, or it may hit the worst case. The chapter's most practitioner-discriminating content is in §6 (when ratios mislead) and §8.
+For a minimization problem, the guarantee says: for every input, the algorithm's solution costs at most `α · OPT`, where `OPT` is the optimal cost. For a maximization problem, the algorithm achieves at least `OPT / α`. In both cases, `α = 1` would mean exact; larger `α` means a looser guarantee. Smaller is better.
 
-## What you need to know first
+The ratio is a *worst-case* bound over all possible inputs. It tells you that no adversary, however cleverly they construct an input, can make the algorithm do worse than `α · OPT`. What it does not tell you is how the algorithm performs on *your specific* input. Your input might produce a solution much closer to optimal. Or it might hit the worst case exactly. The ratio alone cannot distinguish between these. This distinction — between the worst-case bound and the typical-case performance — is the most important thing to understand about approximation algorithms, and I will return to it.
 
-This chapter assumes Big O (Chapter 2), greedy structure (Chapter 6), DP (Chapter 8), graph theory (Chapter 5), and an NP-hardness vocabulary (Chapter 10). For LP relaxation as an approximation technique, see Chapter 13. For randomized rounding, see Chapter 12.
+<!-- → [INFOGRAPHIC: two-panel diagram illustrating the approximation contract — left panel: number line from OPT to α·OPT, with "algorithm's solution lands somewhere in here" shaded and a question mark indicating the algorithm's actual output position within the range; right panel: two sample instances, one where the algorithm hits near OPT, one where it hits near α·OPT — student should see that the ratio defines the ceiling, not the landing spot] -->
 
-## Approximation ratio — the contract
+---
 
-An algorithm `A` is an `α`-approximation for a minimization problem if, for every instance, `A`'s solution costs at most `α · OPT`, where `OPT` is the optimal cost. For a maximization problem, `A`'s solution achieves at least `OPT / α`. Convention: `α ≥ 1`. Smaller is better.
+## A Hierarchy of Guarantees
 
-Three classes of approximation guarantees, in increasing strength.
+Not all approximation guarantees are equal. Four classes, in increasing strength.
 
-**Constant-factor approximation.** The ratio is a constant independent of input size. Vertex cover admits a 2-approximation. Metric TSP admits a 1.5-approximation (Christofides 1976) [verify]. Steiner tree admits a 1.39-approximation [verify]. Useful when "within a constant factor" is acceptable.
+A **constant-factor approximation** gives a ratio that is a fixed constant independent of input size. Vertex cover admits a 2-approximation. Metric TSP admits a 1.5-approximation (Christofides, 1976). These algorithms are useful when "within a constant factor of optimal" is acceptable — which, for many engineering problems, it is.
 
-**Polynomial-Time Approximation Scheme (PTAS).** For any `ε > 0`, the algorithm produces a `(1 + ε)`-approximation in time polynomial in `n` (but possibly exponential in `1/ε`). Examples: Euclidean TSP (Arora 1998, Mitchell 1999) [verify], minimum makespan scheduling. The user picks `ε`; smaller `ε` means better solution, more time.
+A **PTAS** — polynomial-time approximation scheme — goes further. For any `ε > 0` you choose, the algorithm produces a `(1 + ε)`-approximation in time polynomial in the input size `n`. The tradeoff is that the running time may depend badly on `ε`: it might be `n^(1/ε)`, which for `ε = 0.05` and `n = 1000` is `1000^20`. That is an astronomically large number. A PTAS is polynomial for each fixed `ε`, but if `ε` needs to be small, the polynomial may be impractical.
 
-**Fully Polynomial-Time Approximation Scheme (FPTAS).** Same `(1 + ε)` guarantee, but in time polynomial in *both* `n` and `1/ε`. Stronger than PTAS. The 0/1 knapsack admits an FPTAS via DP rounding. Bin packing admits an asymptotic PTAS but not an FPTAS [verify].
+An **FPTAS** — fully polynomial-time approximation scheme — removes the bad dependence on `ε`. It runs in time polynomial in both `n` and `1/ε`. The 0/1 knapsack problem admits an FPTAS via a technique I'll describe. This is the strongest class of approximation guarantee: you can make `ε` as small as you like, say `ε = 0.001` for solutions within 0.1% of optimal, and the running time scales gracefully.
 
-**Logarithmic-factor approximation.** Set cover admits an `H_n ≈ ln n`-approximation via greedy (Chapter 6). The ratio grows with input size, but slowly.
+A **logarithmic-factor approximation** has a ratio that grows slowly with input size. Set cover admits an `H_n ≈ ln n` approximation via a simple greedy algorithm, where `H_n = 1 + 1/2 + 1/3 + ... + 1/n`. For `n = 10,000` this is roughly 9.2 — the greedy solution uses at most about 9 times as many sets as the optimal. The ratio grows, but slowly.
 
-**Inapproximable problems.** Some NP-hard problems are provably hard to approximate within any constant factor, unless P = NP. Maximum clique cannot be approximated within `n^(1−ε)` for any `ε > 0` unless P = NP (Håstad 1996) [verify]. The PCP theorem (Arora-Lund-Motwani-Sudan-Szegedy 1998) [verify] is the foundational machinery for inapproximability proofs.
+Some NP-hard problems cannot be approximated within any constant factor unless P = NP. Maximum clique cannot be approximated within `n^(1−ε)` for any `ε > 0` under standard complexity assumptions. For these problems, no polynomial-time algorithm with a useful guarantee exists. The boundary between approximable and inapproximable is itself a deep mathematical structure — the PCP theorem is the machinery that produces most inapproximability results — but for a practitioner, the relevant fact is simpler: check the literature before investing in an approximation algorithm that cannot exist.
 
-## Design techniques
+<!-- → [TABLE: approximation guarantee hierarchy — rows: constant-factor, PTAS, FPTAS, logarithmic-factor, inapproximable; columns: guarantee form, running time dependence on ε, canonical example, what makes it stronger than the row above; student should be able to classify a new guarantee they encounter by reading down the "guarantee form" column] -->
 
-Four canonical techniques. Each yields approximation algorithms for a class of problems.
+---
 
-**Greedy.** Make locally optimal choices; bound the worst-case suboptimality. Set cover greedy gives `ln n`. Vertex cover via the matched-edge approach gives 2 (described below).
+## Three Design Techniques
 
-**Local search.** Start with a feasible solution; improve by local moves until no improvement is possible. Many local-search algorithms have provable approximation ratios; many do not. Used heavily in practice when no constant-factor algorithm exists.
+Most approximation algorithms are built from one of three templates. Recognizing the template tells you both how the algorithm works and why the ratio holds.
 
-**Linear programming relaxation and rounding.** Formulate the problem as integer linear programming (ILP); relax integrality (allow fractional values); solve the LP in polynomial time (Chapter 13); round the fractional solution to an integer solution. The rounding scheme determines the approximation ratio. Vertex cover via LP rounding gives 2 (matching the greedy bound by a different proof). The technique is general — many approximation algorithms are LP-rounding underneath.
+**Greedy with a charging argument.** Make locally optimal choices and bound the ratio by arguing that every unit of "extra" cost in the greedy solution can be "charged" to a unit of cost in the optimal solution. Set cover via greedy is the canonical example. Vertex cover via maximal matching is another. The greedy algorithm runs fast; the analysis establishes the ratio by a careful accounting argument.
 
-**Dynamic programming with rounding.** When a problem has a pseudo-polynomial DP solution (Chapter 8 §6), rounding the input values can produce a polynomial-time algorithm with `(1 + ε)` approximation. The 0/1 knapsack FPTAS works this way: round each value to a precision determined by `ε`, run DP on the rounded values, return the result.
+**LP relaxation and rounding.** Formulate the optimization problem as an integer program — a linear program where variables must take integer values. Integer programs are NP-hard in general. Relax the integrality constraint, allowing variables to take fractional values. Now the problem is a linear program, solvable in polynomial time (Chapter 13). Take the fractional solution and round it to integers by some scheme. The rounding scheme determines the approximation ratio, and the LP optimum provides the lower bound you compare against. Many approximation algorithms are LP-rounding underneath, even when they're described in combinatorial terms.
 
-## Canonical approximation algorithms
+**DP rounding for FPTAS.** When a problem has a pseudo-polynomial DP solution — one whose running time is polynomial in the numeric values of the inputs — rounding the input values to a coarser precision produces a polynomial-time algorithm with a `(1 + ε)` guarantee. The trick: round each value down to the nearest multiple of some threshold Δ that depends on `ε` and the optimal value. The rounded problem has fewer distinct values, the DP table shrinks, and the error introduced by rounding is bounded by a function of `ε`. The 0/1 knapsack FPTAS works exactly this way.
 
-**Vertex cover, 2-approximation (matched-edge).** Find any maximal matching `M`. Output the set of all endpoints of edges in `M`. Bound: `|M|` is a lower bound on optimum (every vertex cover must touch every matched edge with a distinct vertex), and the algorithm outputs `2|M|` vertices. Ratio: 2. Simple, fast, and tight up to a small constant — vertex cover is hard to approximate below 2 unless P = NP.
+<!-- → [IMAGE: three-template diagram for approximation algorithm design — three horizontal lanes labeled "Greedy + charging", "LP relax + round", "DP round for FPTAS"; each lane contains: (1) the key idea in one sentence, (2) what provides the lower bound for the ratio proof, (3) canonical example problem; arrows connect the canonical example to its ratio; student should be able to match a new algorithm they read about to its design template] -->
 
-The "max-cover greedy" — repeatedly pick the vertex covering the most uncovered edges — is a different algorithm. It also achieves 2-approximation but with more work; the matched-edge algorithm is the cleaner one.
+---
 
-**Set cover, `H_n`-approximation (greedy).** Repeatedly pick the set covering the most uncovered elements. The bound: the algorithm outputs a cover of size at most `H_n · OPT`, where `H_n = 1 + 1/2 + 1/3 + ... + 1/n ≈ ln n`. The ratio is essentially tight: `(1 − o(1)) ln n` is the best polynomial-time ratio possible unless P = NP (Feige 1998) [verify].
+## The Four Canonical Problems
 
-**Metric TSP, 1.5-approximation (Christofides).** For TSP on a metric (triangle inequality holds): build the MST, find a minimum-weight perfect matching on the odd-degree vertices, combine into an Eulerian multigraph, shortcut to a Hamiltonian cycle. Ratio: 1.5. Held the best-known ratio for metric TSP for over 40 years until 2020 improvements [verify].
+**Vertex cover.** A vertex cover of a graph is a set of vertices such that every edge has at least one endpoint in the set. Finding the minimum vertex cover is NP-hard.
 
-**Knapsack, FPTAS.** Round item values to a precision tied to `ε`, run pseudo-polynomial DP, return the rounded-DP solution. Time: `O(n³/ε)`. For `ε = 0.01` (1% from optimum), the algorithm runs in `O(100 n³)`.
+The 2-approximation: find any maximal matching — a set of edges such that no two share an endpoint, and no more edges can be added without violating this. Take all the endpoints of the matched edges as your cover. This is valid: every unmatched edge has both endpoints in the matching, so every edge is covered. And the size is at most 2 · OPT: the optimal cover must include at least one endpoint of every matched edge, and the matched edges don't share endpoints, so the optimal needs at least `|M|` vertices — but the algorithm outputs `2|M|`. Ratio: 2.
 
-**Bin packing, First-Fit Decreasing (FFD).** Sort items by decreasing size; for each item, place it in the first bin with enough remaining capacity, opening a new bin if none fits. Ratio: roughly 11/9 in the asymptotic sense (Yue 1991) [verify]. The exact constants are subtle; the practical performance is excellent.
+The algorithm is fast, clean, and the bound is believed to be tight — vertex cover is hard to approximate below 2 under a complexity assumption stronger than P ≠ NP. The 2-approximation is essentially the best polynomial-time algorithm known.
 
-**Scheduling, list scheduling on identical machines.** Assign each job in arrival order to the machine with the least current load. Ratio: 2 − 1/m (Graham 1966) [verify]. Improvement to 4/3 + ε via PTAS.
+**Set cover.** A universe of elements, a collection of subsets. Find the minimum number of subsets whose union covers the universe. Finding the minimum set cover is NP-hard.
 
-**Vertex cover, LP-rounding 2-approximation.** Solve the LP relaxation (each vertex assigned a fractional value in [0, 1] subject to "for every edge, the two endpoints' values sum to at least 1"). Round: include every vertex with value ≥ 1/2. The constraint guarantees every edge has an included endpoint. Ratio: 2. Same bound as matched-edge, different proof.
+The greedy approximation: repeatedly pick the subset covering the most uncovered elements, until everything is covered. Time: `O(|U| · m)` where `m` is the number of candidate subsets.
 
-**Steiner tree, 2-approximation.** Build the minimum spanning tree on the metric closure of required vertices. Ratio: 2. Improvements to 1.39 [verify] via more sophisticated techniques.
+Why does this give an `H_n`-approximation? Here is the argument. Label each element with the cost of the iteration in which it got covered: if the greedy algorithm covers `k` new elements in a step where it picks a set of size `s`, charge each new element `1/k` of the cost of that set. The element that gets covered when there are `t` elements remaining is charged at most `1/t` (since the greedy set covers at least one element, and we could have covered this one by picking its optimal set). Summing over all elements: the total charge is at most `H_n · OPT`. This argument has the flavor of amortized analysis — distributing a cost across the elements it benefits.
 
-## When the ratio misleads
+The ratio `H_n ≈ ln n` is essentially optimal: Feige showed in 1998 that set cover cannot be approximated within `(1 − o(1)) ln n` in polynomial time unless NP ⊆ DTIME(`n^(log log n)`), which is believed to be false.
 
-The chapter's most practitioner-discriminating content. An approximation ratio is a worst-case guarantee; it is not a prediction.
+**Metric TSP.** The traveling salesman problem asks for the minimum-cost tour visiting every city exactly once. General TSP is NP-hard to approximate within any constant unless P = NP — the problem is in the same inapproximability class as clique. But when the distances satisfy the triangle inequality (the metric condition: going directly from A to C is never more expensive than going A → B → C), a 1.5-approximation exists.
 
-**Worst case may not be your case.** A 2-approximation guarantees no instance produces a solution worse than 2 · OPT. On your specific instance, the algorithm may produce 1.01 · OPT — or 2 · OPT exactly. The ratio bounds the worst; it does not characterize the typical. For most real instances, the algorithm performs better than the bound, sometimes much better.
+Christofides' algorithm (1976) works as follows. Compute the minimum spanning tree `T` on the cities. Identify the set `O` of vertices with odd degree in `T` — there are an even number of them. Find a minimum-weight perfect matching on `O`. Add the matching edges to `T` to get a multigraph where every vertex has even degree. Find an Eulerian circuit (a tour that traverses every edge exactly once). Shortcut the Eulerian circuit: when revisiting a city already visited, skip it and go directly to the next unvisited city. The shortcut is valid because the triangle inequality ensures skipping a city doesn't increase the cost.
 
-**The constant in the ratio matters.** A "2-approximation" sounds good. But for an NP-hard problem where exact solutions are 100 units, a 2-approximation might output 200. If a heuristic with no guarantee outputs 105 on the same instance, the heuristic wins on this case. The approximation's value is the *guarantee*, not the constant — but in production, both matter.
+Why 1.5? The MST costs at most `OPT` (the optimal tour is a Hamiltonian cycle, which is a spanning tree plus one edge). The minimum matching on `O` costs at most `OPT/2` (this takes more work to prove, using the fact that the odd-degree vertices can be paired in two ways by traversing the optimal tour, and one of those ways costs at most half the tour). Total: at most `1.5 · OPT`.
 
-**The ratio is the *worst* over all instances.** A `(1 + ε)`-PTAS sounds tight. But the running time may be `n^(1/ε)`, which is `n^100` for `ε = 0.01`. The algorithm is "polynomial" but uselessly slow. The FPTAS distinction (polynomial in `1/ε` too) is what makes the scheme practical.
+<!-- → [IMAGE: step-by-step Christofides walkthrough on a small 6-city metric graph — four panels: (1) the 6-city graph with edge weights; (2) MST highlighted, odd-degree vertices circled; (3) minimum perfect matching on odd-degree vertices added as dashed edges; (4) Eulerian circuit shortcut to Hamiltonian tour with the shortcut edges annotated; annotate the MST cost ≤ OPT and matching cost ≤ OPT/2 arguments at the relevant panels; student should see the algorithm as a physical construction, not just a proof] -->
 
-**Two algorithms with the same ratio can perform very differently.** Two 2-approximations for vertex cover (matched-edge vs LP-rounding) produce different solutions. On your instances one may consistently beat the other in practice. The ratio guarantees the worst; it does not rank the algorithms on average performance.
+Christofides' algorithm held the best-known ratio for metric TSP for over forty years. A 2020 result by Karlin, Klein, and Oveis Gharan broke this for general metrics (to something slightly below 1.5), but the improvement is not yet practical.
 
-**The ratio assumes the model.** Metric TSP's 1.5-approximation requires the triangle inequality. If your distances violate it (e.g., asymmetric distances or distances that can game the algorithm), the bound is void. A practitioner who applies Christofides without checking the metric assumption may get arbitrarily bad results.
+**Knapsack FPTAS.** You have `n` items with weights and values; pick a subset of maximum value subject to a weight constraint. The exact pseudo-polynomial DP (Chapter 8) runs in `O(nW)` time — fine for moderate `W`, slow for large `W`.
 
-**Inapproximability is a hard wall.** Some problems cannot be approximated below a threshold unless P = NP. Maximum clique, MAX-3SAT (above 7/8), graph coloring (above `n^(1−ε)`), set cover (below `ln n`) — these have proven lower bounds on polynomial-time approximation. No future algorithm will improve the ratio without first resolving P vs NP.
+The FPTAS: scale and round each item's value down to the nearest multiple of Δ = `ε · v_max / n`, where `v_max` is the maximum item value and `ε` is the desired precision. Run the DP on the rounded values. The number of distinct rounded values is at most `n / ε`, so the DP table has `O(n² / ε)` entries and the algorithm runs in `O(n³ / ε)` — polynomial in both `n` and `1/ε`.
 
-## Decision rules
+The rounding introduces error. Each item's value is reduced by at most Δ. The total error is at most `n · Δ = ε · v_max`. The optimal value is at most `n · v_max`. So the solution value is at least `OPT − ε · v_max ≥ (1 − ε) · OPT`. Ratio: `1/(1 − ε)`, which for small `ε` is approximately `1 + ε`.
 
-| Problem situation | Approach |
-| --- | --- |
-| NP-hard, want bounded-quality polynomial-time solution | Approximation algorithm |
-| Want `(1 + ε)` for any `ε`, time polynomial in `n` | PTAS |
-| Want `(1 + ε)` time polynomial in `n` and `1/ε` | FPTAS |
-| Constant-factor sufficient | Constant-factor approximation |
-| Need to know if better-than-`α` is possible | Check inapproximability literature |
-| Greedy gives `ln n`-approximation, set-cover-style | Greedy approximation |
-| Problem has natural LP formulation | LP relaxation + rounding |
-| Pseudo-polynomial DP exists | DP rounding for FPTAS |
-| Worst case rare, want best practical performance | Heuristic; approximation as fallback or sanity check |
-| Ratio matters less than absolute performance | Compare algorithms on representative benchmarks |
+This construction — round to reduce the DP's state space, bound the rounding error — is the general recipe for turning pseudo-polynomial DP into FPTAS whenever the structure permits.
 
-## Worked example — set cover for sensor placement
+<!-- → [IMAGE: before-and-after diagram for knapsack FPTAS value rounding — left: bar chart of original item values (varying heights); right: same items with values rounded down to nearest multiple of Δ (stepped heights); annotate Δ = ε·v_max/n below; label the gap between original and rounded value on one bar as "≤ Δ per item"; label total error as "≤ n·Δ = ε·v_max"; student should see geometrically why the rounding error is bounded and how it connects to the ε guarantee] -->
 
-A municipal water utility wants to place water-quality sensors in its distribution network. The network has 10,000 junctions [verify]. Each potential sensor location, if installed, can detect contamination at a known set of downstream junctions before the contamination reaches consumers. The utility wants to find the minimum number of sensor locations such that every junction is monitored by at least one sensor.
+---
 
-This is set cover. Universe `U` = junctions. Subsets `S_i` = the set of junctions that sensor location `i` covers. Goal: minimum subset of `S_i` whose union is `U`.
+## When the Ratio Misleads
 
-Set cover is NP-hard. Exact solution is infeasible at this scale.
+This is the content that matters most for applying these algorithms in practice. Four misreadings, each common.
 
-**Greedy approximation.** Repeatedly pick the candidate sensor location covering the most uncovered junctions. Time: `O(|U| · m)` where `m` is the number of candidate locations. For 10,000 junctions and 1,000 candidate locations [verify], this is `10⁷` operations — instant.
+**Misreading 1: "The ratio tells me how good my answer is."** It does not. The ratio tells you the worst case over all possible inputs. Your specific input might produce a solution much closer to optimal — empirically, the vertex cover 2-approximation typically outputs solutions between 1.05× and 1.3× optimal on random graphs, nowhere near 2×. Or your input might be adversarially constructed to hit the ratio exactly. The ratio is a guarantee about the contract, not a prediction about the outcome. To know how the algorithm performs on your data, you have to benchmark on your data.
 
-**Bound.** The greedy solution uses at most `H_n · OPT ≈ 9.21 · OPT` sensors for `n = 10,000`. So if the optimal placement is 50 sensors, greedy uses at most ~460 sensors. That bound is loose for most realistic instances; in practice, greedy on water-network sensor placement typically runs at 1.1× to 1.3× optimal [verify].
+**Misreading 2: "A smaller ratio means a better algorithm in practice."** A 1.5-approximation for TSP sounds better than a 2-approximation. On your specific instances, the 2-approximation might produce smaller tours, run ten times faster, and require one-tenth the memory. The ratio ranks algorithms on the worst case; it says nothing about average-case performance, constant factors, or implementation complexity. Two algorithms with the same ratio can perform very differently in practice.
 
-**When the bound is meaningful.** For arbitrary set-cover instances, the `ln n` ratio is essentially tight (Feige 1998). On adversarial inputs designed to make greedy fail, the ratio approaches `ln n`. On your sensor-placement instance, the structure (geographic locality, downstream-only coverage, network topology) usually makes greedy do much better.
+**Misreading 3: "A PTAS is always practical."** A PTAS runs in time polynomial in `n` for any fixed `ε`. For `ε = 0.01` and a running time of `n^(1/ε) = n^100`, the algorithm is technically polynomial and practically useless. This is why the FPTAS distinction matters — it is the class of schemes where the running time is polynomial in both `n` and `1/ε`, making tight approximation genuinely achievable.
 
-**When the bound misleads.** If a few candidate sensors cover most of the network and many candidates cover only a few junctions, greedy's first picks dominate; subsequent picks are nearly optimal. If coverage is highly uniform — every candidate covers about the same number of junctions — greedy's worst-case behavior is closer to the bound. The water utility should benchmark on synthetic and historical contamination scenarios; the ratio is a backstop, not a prediction.
+**Misreading 4: "The bound applies without checking the assumptions."** Christofides' 1.5-approximation requires the triangle inequality. If your distances violate it — as they might with asymmetric costs, or with time-dependent travel times, or with any non-metric structure — the algorithm has no ratio guarantee. LP-rounding bounds depend on the integrality gap of the relaxation. Greedy set-cover bounds depend on being able to compute coverage cheaply. Each algorithm's ratio comes attached to a model assumption. Violating the assumption voids the contract silently, without the algorithm noticing.
 
-**Alternative: ILP via solver.** Encode as integer linear programming (Chapter 13). Solve with Gurobi, CPLEX, or OR-Tools. For 10,000 junctions, modern solvers handle this size in minutes [verify]. The exact solution beats greedy; the time cost is non-trivial but manageable. In production, the practitioner runs both — solver for the ground truth, greedy for fast iteration during model development.
+The corrective practice: when applying an approximation algorithm, check its assumptions against your problem instance. Benchmark on representative data. Report the typical-case ratio alongside the theoretical worst-case bound. The bound is the floor of the guarantee; the benchmark is the prediction about your specific workload.
 
-**Alternative: LP rounding.** Solve the LP relaxation, round fractional variables to integers via deterministic threshold or randomized rounding (Chapter 12). For set cover, LP rounding gives the same `O(log n)` ratio as greedy, with a different constant.
+<!-- → [CHART: empirical ratio distribution for vertex cover 2-approximation on random Erdős-Rényi graphs — x-axis is empirical ratio (approx/OPT), y-axis is frequency; the distribution should be centered around 1.1–1.3 with no observations near 2.0; annotate the theoretical worst-case bound as a vertical dashed line at x=2; student should see viscerally that the worst-case bound is rarely approached on random instances, grounding Misreading 1 in data rather than assertion] -->
 
-**Other production set-cover instances.**
+---
 
-*Server location.* CDN edge-server placement: candidate cities, demand cities, latency thresholds. Each candidate "covers" the demand cities it can serve under threshold. Find minimum servers covering all demand. NP-hard; greedy and LP-rounding deployed routinely.
+## Inapproximability: Where the Wall Is
 
-*Test-suite reduction.* Software regression testing: candidate tests, code branches each test exercises. Find minimum tests covering all branches. Tools like Coverity and SonarQube use set-cover heuristics for this. [verify].
+Some NP-hard problems cannot be approximated within any useful factor in polynomial time, assuming standard complexity conjectures. Knowing where this wall is matters for deciding whether to look for an approximation algorithm or give up on guarantees entirely.
 
-*Feature selection.* Machine learning: candidate features, training examples each feature distinguishes. Find minimum features distinguishing all examples. The matroid analog admits polynomial algorithms for some special cases (Chapter 6); the general case is set cover.
+Maximum clique — finding the largest complete subgraph — is NP-hard to approximate within `n^(1−ε)` for any `ε > 0`. For a graph on 1000 vertices, this means no polynomial-time algorithm is known to give a solution within a factor of 1000^0.99 ≈ 900 of optimal. The problem is essentially as hard to approximate as to solve.
 
-The lesson: set cover is everywhere once you can see it. The greedy ratio is loose on most real instances. Knowing the bound exists tells you nothing will be catastrophically worse; knowing the bound is loose tells you the typical case is better than the bound suggests. Both readings matter.
+Graph coloring — finding the minimum number of colors to color vertices so no adjacent pair shares a color — is NP-hard to approximate within `n^(1−ε)` as well. MAX-3SAT — maximizing the fraction of satisfied clauses in a 3-CNF formula — cannot be approximated above 7/8 in polynomial time unless P = NP (and 7/8 is achievable by a trivial random assignment).
 
-## Failure modes — when "the ratio tells you how good your answer is" misleads
+The machinery behind these results is the PCP theorem, which characterizes NP in terms of probabilistically checkable proofs. The theorem implies that the gap between satisfiable and unsatisfiable instances is preserved under polynomial reductions in a strong sense, making hardness of approximation proofs possible. For a practitioner, the relevant implication is: before designing an approximation algorithm, check whether the problem is inapproximable. If it is, the effort should go into heuristics, special cases, or exact algorithms for restricted inputs.
 
-The misconception engaged: "An approximation guarantee tells you how good the answer is on this instance."
+---
 
-It does not. The ratio is a worst-case bound over all instances. Three concrete failures.
+## Back to the Sensor Network
 
-**Treating the ratio as a per-instance bound.** A 2-approximation guarantees no instance produces a result worse than 2 · OPT. It does not promise your particular instance produces a result close to 2 · OPT, or close to OPT. The bound is over a hostile adversary; your instance may be much better, or might hit the adversary's worst case. To know how the algorithm performs on your data, benchmark.
+The water utility's sensor placement problem is set cover. The greedy algorithm runs in seconds on 10,000 junctions. The ratio bound is `H_{10,000} ≈ 9.2`. If optimal uses 50 sensors, greedy guarantees at most ~460 — a bound that sounds alarming.
 
-**Comparing algorithms by ratio rather than performance.** A 1.5-approximation sounds better than a 2-approximation. On a specific instance, the 2-approximation may produce a smaller cover, finish faster, and use less memory. The ratio is one dimension; production performance includes time, memory, implementation complexity, and how well the algorithm handles structured inputs. Choose by what matters for your workload.
+But that bound is the worst case over all possible set-cover instances, including adversarial ones. Water networks are geographic: sensors cover downstream junctions, coverage regions have spatial structure, and realistic contamination scenarios tend to cluster. On instances with this structure, greedy typically runs at 1.1× to 1.3× optimal in practice. The utility should verify this on its specific network and scenario set — but the reasonable expectation is that the 9.2× worst case will never materialize.
 
-**Assuming polynomial-time = practical-time.** A PTAS with running time `n^(1/ε)` is polynomial. For `ε = 0.05` (5% from optimum) and `n = 1000`, this is `1000^20 = 10^60` operations — older than the universe. The FPTAS distinction matters: only fully polynomial schemes are reliably practical for tight `ε`.
+The utility could also run an ILP solver for the exact optimum. Modern solvers handle set cover instances of this size in minutes. The standard production approach: run the ILP for the exact solution on the real network, run greedy during model development when you need fast iteration, and know that greedy's solution, whatever it is, is within `9.2 · OPT` in the worst case. Both algorithms serve a purpose; neither is universally better.
 
-**Forgetting the model assumptions.** Christofides' 1.5-approximation requires a metric (triangle inequality). LP rounding assumes the LP has integral optima or a known integrality gap. Greedy set cover assumes you can compute coverage cheaply. Violating an assumption voids the bound silently.
+---
 
-**Chasing tighter ratios where practical performance does not need them.** Set cover greedy is `H_n`. There is no constant-factor polynomial-time algorithm. Spending engineering time to improve from `H_n` to `H_n − 1` is rarely worth it; spending time on instance-aware heuristics that beat `H_n` on your specific data often is. The theoretical literature optimizes the worst case; production optimizes the typical case.
+## What You Can Do Now
 
-The corrective heuristic: state the ratio and the model assumptions; benchmark on representative instances; report typical-case behavior alongside the worst-case guarantee. The ratio is a contract about the worst; the benchmark is the prediction about the typical.
+Given an NP-hard optimization problem, you can identify whether a polynomial-time approximation algorithm exists with a known ratio. You can distinguish constant-factor, PTAS, FPTAS, and inapproximable cases. You can recognize the three design templates — greedy with a charging argument, LP relaxation and rounding, DP rounding for FPTAS — and apply the canonical algorithms for vertex cover, set cover, metric TSP, and knapsack. And you can interpret the ratio correctly: as a worst-case contract over all inputs, not a prediction about your specific instance.
 
-## Cross-references
+The boundary between approximable and inapproximable, between PTAS and FPTAS, is not arbitrary. It reflects deep structure in the problem class. Chapter 10 establishes the NP-hardness of the problems here. Chapter 13 develops LP relaxation as a general tool. Chapter 12 shows how randomization — particularly randomized rounding — extends the LP-rounding technique to problems where deterministic rounding loses too much.
 
-For the greedy algorithms underlying many approximation algorithms (vertex cover, set cover, MST), see Chapter 6. For DP-based FPTAS (knapsack), see Chapter 8 §6. For LP relaxation and rounding in detail, see Chapter 13 §3. For randomized rounding and Las Vegas / Monte Carlo distinctions, see Chapter 12. For the NP-hardness reductions that motivate approximation, see Chapter 10.
+---
 
-## Companion-page handoffs
+## Exercises
 
-Comparative approximation-algorithm benchmarks across vertex cover, set cover, TSP, knapsack, bin packing, scheduling; PCP theorem reading list; inapproximability catalog; LP rounding tutorials; FFD bin-packing implementation with worked-out worst-case constructions; Christofides' algorithm walkthrough. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-11.
+### Warm-Up
 
-## What this chapter does not enable
+**1.** For each of the following guarantees, classify it as constant-factor approximation, PTAS, FPTAS, logarithmic-factor approximation, or inapproximable (under standard assumptions). Justify each answer in one sentence.
 
-This chapter does not give a procedure for designing a new approximation algorithm for an arbitrary problem. The art of approximation — finding an LP relaxation with a small integrality gap, designing a primal-dual algorithm, exploiting problem-specific structure — is research-level material; for that, consult Williamson and Shmoys's *The Design of Approximation Algorithms* or Vazirani's *Approximation Algorithms*. The chapter also does not cover online approximation (decisions made under uncertainty about future input), which lives in online-algorithms literature, or the specific machinery of the PCP theorem and inapproximability hardness proofs.
+- An algorithm for vertex cover that always returns a solution of size at most `2 · OPT`
+- An algorithm for set cover that runs in `O(|U| · m)` and returns a solution of size at most `(ln n + 1) · OPT`
+- An algorithm for knapsack that, given any `ε > 0`, returns a solution of value at least `(1 − ε) · OPT` in time `O(n³ / ε)`
+- A claimed algorithm for maximum clique that returns a clique of size at least `OPT / 5` in polynomial time
+- An algorithm for Euclidean TSP that, for any `ε > 0`, returns a tour of length at most `(1 + ε) · OPT` in time `n^(O(1/ε))`
 
-## Capability statement
+*Tests: classifying approximation guarantees; recognizing the FPTAS vs. PTAS distinction; identifying a claim that violates inapproximability.*
 
-You can now identify or apply an approximation algorithm with a known ratio for a given NP-hard problem; distinguish constant-factor / PTAS / FPTAS / inapproximable; correctly interpret what the ratio guarantees and what it does not; choose between greedy, LP-rounding, and DP-rounding design techniques; and avoid the failure modes that come from misreading the ratio as a per-instance bound. The next time an NP-hard problem arrives with "we need a fast solution that we can defend," the path from problem to algorithm and ratio is in your hands.
+**2.** State the approximation ratio for the vertex cover maximal-matching algorithm and prove it is correct. Your proof must: (a) argue the output is a valid vertex cover, (b) identify a lower bound on OPT derived from the matching, and (c) show the algorithm's output size is at most twice that lower bound.
 
+*Tests: executing the charging/lower-bound style of approximation ratio proof; understanding the matched-edge lower bound argument.*
+
+**3.** An algorithm for bin packing (First-Fit Decreasing) guarantees a solution using at most `(11/9) · OPT + 6/9` bins. A colleague has implemented the algorithm and benchmarked it on their data: it typically uses `1.02 · OPT` bins.
+
+(a) What does the ratio guarantee in the event of a truly adversarial input?
+
+(b) The colleague wants to use the algorithm in production and says "the ratio is 11/9, so we're always at most 22% above optimal." Is this interpretation correct? Why or why not?
+
+(c) What is the minimum information you would want before trusting the algorithm for a specific production workload?
+
+*Tests: interpreting an approximation ratio correctly; distinguishing worst-case guarantee from typical-case performance; specifying the benchmarking requirement.*
+
+---
+
+### Application
+
+**4.** Apply the set cover greedy algorithm to the following instance. Universe `U = {1, 2, 3, 4, 5, 6}`. Candidate sets: `S₁ = {1, 2, 3, 4}`, `S₂ = {2, 4, 5}`, `S₃ = {1, 3, 6}`, `S₄ = {5, 6}`.
+
+(a) Trace the greedy algorithm step by step. At each step, name the set chosen and the elements newly covered.
+
+(b) What is the greedy solution size? What is the optimal solution size? Compute the empirical ratio `greedy / OPT` for this instance.
+
+(c) The ratio bound is `H_6 ≈ 2.45`. The empirical ratio you computed is probably smaller. What does this tell you about the tightness of the `H_n` bound?
+
+*Tests: executing the greedy set cover algorithm; comparing empirical and theoretical ratio; reasoning about bound tightness.*
+
+**5.** The knapsack FPTAS scales item values by Δ = `ε · v_max / n`. Consider a knapsack instance with `n = 4` items and values `{10, 6, 5, 3}`, and `ε = 0.5`.
+
+(a) Compute Δ. Round each item value down to the nearest multiple of Δ to get the rounded values.
+
+(b) The exact DP on the rounded values gives an optimal rounded solution. Suppose that solution has value `V_rounded`. What is the worst-case gap between `V_rounded` and the true optimal `OPT`? Express it in terms of the original values.
+
+(c) For `ε = 0.1` on the same instance, recompute Δ and the rounded values. How does the table size (number of distinct values) change? This is the FPTAS tradeoff in action: name it explicitly.
+
+*Tests: executing the FPTAS rounding step; bounding the rounding error; seeing the ε–table size tradeoff concretely.*
+
+**6.** An approximation algorithm for metric TSP (not Christofides — a simpler 2-approximation via MST doubling) works as follows: compute the MST, double every edge to make all vertices even-degree, find an Eulerian circuit, shortcut. Argue this gives a 2-approximation.
+
+Your argument should: (a) bound the MST cost in terms of OPT, (b) bound the doubled-edge cost in terms of OPT, (c) argue the shortcutting step doesn't increase cost (name the property required), and (d) add the bounds to get the ratio.
+
+Then explain what Christofides improves and why the matching step produces a tighter bound than simply doubling all edges.
+
+*Tests: constructing a ratio proof from first principles; understanding why Christofides improves on MST-doubling; applying the triangle inequality to shortcutting.*
+
+---
+
+### Synthesis
+
+**7.** A network operator wants to deploy monitoring agents across a data center network. Nodes are servers; edges are network links. An agent on a server monitors all links incident to it (a vertex cover). The operator wants the minimum number of agents such that every link is monitored.
+
+(a) Map this to vertex cover. What is the universe? What is a feasible solution?
+
+(b) Apply the 2-approximation. The network has 1,000 servers and 4,000 links. What is the worst-case guarantee on number of agents?
+
+(c) A security argument requires that the solution be within 10% of optimal. Can the 2-approximation satisfy this requirement? If not, is there any polynomial-time algorithm that can? Justify with reference to inapproximability.
+
+(d) The operator's actual network is a near-planar graph (data centers are physically structured). Does the inapproximability result apply to planar graphs? What algorithmic options improve when graph structure is restricted?
+
+*Tests: reducing an application problem to vertex cover; applying the approximation in context; reasoning about inapproximability vs. special-case tractability.*
+
+**8.** Compare the greedy set cover algorithm and LP-rounding for set cover. Both achieve an `O(log n)` approximation ratio.
+
+(a) Describe the LP-rounding approach for set cover in enough detail to explain where the `O(log n)` ratio comes from. (Hint: the LP assigns fractional values to sets; the rounding scheme samples each set with probability proportional to its fractional value and repeats until covered.)
+
+(b) What is the advantage of LP-rounding over greedy? What is the disadvantage?
+
+(c) Both algorithms produce different solutions on the same instance. For the water utility's sensor placement (10,000 junctions, 1,000 candidate sensors), which would you choose for production and why? Your answer should address running time, quality guarantee, and implementation complexity.
+
+*Tests: comparing two approximation algorithms with the same ratio but different designs; making a practical engineering choice with explicit tradeoffs.*
+
+---
+
+### Challenge
+
+**9.** The PCP theorem states (informally) that NP = PCP(log n, 1) — every NP language has a probabilistically checkable proof that can be verified using O(log n) random bits and reading a constant number of bits from the proof. This seemingly technical characterization is the foundation of most inapproximability results.
+
+(a) Explain informally how the PCP theorem implies that MAX-3SAT cannot be approximated above 7/8 in polynomial time unless P = NP. (You do not need to prove the theorem — explain the reduction idea at the conceptual level.)
+
+(b) MAX-3SAT has a trivial 7/8-approximation: assign each variable uniformly at random. Each clause is satisfied with probability 7/8. Explain why this matches the inapproximability bound and what it implies about the hardness landscape of MAX-3SAT compared to, say, vertex cover.
+
+(c) Set cover has an inapproximability threshold of `(1 − o(1)) ln n` and the greedy algorithm achieves `H_n ≈ ln n`. This means greedy is essentially optimal for polynomial-time set cover. Explain why this is both a positive result (greedy is near-optimal) and a negative result (no polynomial algorithm can do significantly better), and what the combination tells you about investing in sophisticated set-cover algorithms.
+
+*Tests: connecting the PCP theorem to specific inapproximability results; reasoning about tight inapproximability thresholds; evaluating when algorithm improvement is and isn't worth pursuing.*
+
+**10.** The FPTAS for knapsack relies on the existence of a pseudo-polynomial DP. Not every NP-hard problem has one.
+
+(a) State precisely what "pseudo-polynomial" means. Why does knapsack have a pseudo-polynomial algorithm while, say, graph coloring does not?
+
+(b) The bin packing problem has an asymptotic PTAS but not an FPTAS (under standard assumptions). What structural property of bin packing prevents the DP-rounding FPTAS construction from applying?
+
+(c) A colleague proposes an FPTAS for the partition problem (given a set of integers, can they be split into two equal-sum subsets?). Is this plausible? Partition is NP-complete. Sketch the DP-rounding argument if you believe it's achievable, or explain the obstacle if you don't.
+
+*Tests: reasoning about when pseudo-polynomial DPs exist and when they don't; understanding what structural property enables the FPTAS construction; applying the FPTAS template to a new problem.*
 
 ---
 
