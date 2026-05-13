@@ -1,145 +1,184 @@
-# Sorting and Caching
+# Chapter 4 — Sorting and Caching
 
-## TL;DR
+*The memory hierarchy is the physics. The algorithm is the engineering.*
 
-Sorting orders elements; caching keeps frequently-accessed elements close. The two appear in one chapter because both are dominated by the memory hierarchy in production, both have a small canonical algorithm catalog, and both have a "use the standard library" answer that hides the more interesting question. Reach for this chapter when you need to choose a sorting algorithm under specific constraints — size, memory, distribution, stability — or pick a cache replacement policy for a workload. After consulting it, you can match algorithm to constraint and explain why your standard library's choice is usually right.
+---
 
-## Recognition pattern
+Here is a question that seems simple until you think about it: why does your standard library sort faster than the algorithm your algorithms course taught you?
 
-You have data to sort, or a working set to keep in fast memory, and the question is *which strategy*.
+The textbook answer to sorting is merge sort or quicksort — both `O(n log n)`, both correct, both reasonable. And yet CPython's `list.sort()` routinely outperforms a clean merge sort implementation on real data by a factor of five or six. Java's `Arrays.sort()` for objects is faster still. Neither of them is pure merge sort. Neither of them is pure quicksort. They are hybrids — three or four algorithms stitched together, each taking over when it has the advantage.
 
-For sorting, the signal is *constraint*. Constraints come in five flavors. Size — does the data fit in RAM? Memory — can you afford `O(n)` auxiliary space? Distribution — is the data nearly sorted, uniformly random, or pathological? Stability — must equal-key elements preserve relative order? Adversarial input — is the order under attacker control? Each constraint rules out a candidate. The right algorithm is the one that survives.
+Understanding why that is true requires understanding two things: the constraint that makes each algorithm win, and the physical reality that every algorithm runs inside. The physical reality is the memory hierarchy. The constraint determines which algorithm survives it.
 
-For caching, the signal is *access pattern*. The reuse-distance distribution determines which replacement policy wins. Workloads with strong recency win on LRU. Workloads with strong frequency win on LFU. Workloads that mix both win on ARC or its descendants. Workloads with neither lose on every policy and need a different intervention.
+This chapter covers sorting and caching together because they are, at bottom, the same problem viewed from two angles. Sorting asks: in what order should I arrange these elements? Caching asks: which elements should I keep close? Both questions are dominated by the same physics — the cost of moving data between slow memory and fast memory — and both have a canonical set of strategies that differ in which constraints they handle. Learn the constraints, and you learn when each strategy wins.
 
-A signal that this chapter is *not* the right one: the sort or cache is provided by the platform — your database does the sort, the CPU does the cache — and you have no control. In that case the chapter helps you reason about what the platform is doing; it does not help you tune what you cannot tune.
+---
 
-## What you need to know first
+## The lower bound and what it does not tell you
 
-This chapter assumes Big O, recurrences, and the master theorem (Chapter 2 §3–4). The cache discussion assumes the memory-hierarchy reasoning from Chapter 2 §6. The heap-sort section refers back to heaps (Chapter 3 §4). For randomized quicksort's analysis, see Chapter 12.
+Before naming algorithms, it is worth understanding what the theory actually says and what it leaves open.
 
-## The classical sort catalog
+Any algorithm that sorts by comparing elements must make at least `Ω(n log n)` comparisons in the worst case. The argument is clean: there are `n!` possible orderings of `n` elements, and each comparison eliminates at most half of them. To distinguish all `n!` cases requires at least `log₂(n!)` comparisons, which by Stirling's approximation is `Ω(n log n)`. Merge sort and heapsort achieve this bound in the worst case. Quicksort achieves it in the expected case.
 
-Six algorithms cover almost every working programmer's needs. The table at the end consolidates; the prose below names the use case each one earns.
+What the lower bound does not tell you: which algorithm is fastest on your specific data. The bound is for the worst case over all possible inputs. Real data has structure — partial sortedness, bounded key ranges, repeated values, predictable access patterns — and algorithms that exploit that structure can beat the worst-case bound on inputs that do not trigger it.
 
-**Bubble sort**, **selection sort**, **insertion sort** — the `O(n²)` family. All three build the sorted result one element at a time. Bubble sort sweeps repeatedly, swapping adjacent out-of-order pairs; selection sort scans for the minimum and places it; insertion sort takes each element and shifts it leftward into the sorted prefix. Of the three, insertion sort is the only one that earns a place in production: it has `O(n)` best-case on already-sorted input, low constants, excellent cache behavior, and is what every standard library calls for small subarrays. Bubble sort is a teaching tool; selection sort is rarely the right call.
+This is the gap between the theory and the engineering. The theory tells you no comparison sort can do better than `O(n log n)` in the worst case. The engineering asks what structure your data actually has, and finds an algorithm that exploits it. Timsort is the canonical answer to that question for general-purpose sorting.
 
-**Merge sort** — `O(n log n)` worst-case, `O(n)` auxiliary space, stable. Divide the array in half, recursively sort each half, merge. The merge step touches each element once per level and there are `log n` levels, giving the bound. Merge sort wins when stability is required (database sorts, ordered iteration over equal-key records) and memory is available. It is the dominant external-memory sort because the merge step is sequential and streams nicely from disk.
+<!-- → [CHART: two curves on the same axes — merge sort vs. insertion sort runtime as a function of n from 4 to 512 — crossover visible around n=32; student sees why every production sort calls insertion sort on small subarrays] -->
 
-**Quicksort** — `O(n log n)` expected, `O(n²)` worst-case, `O(log n)` stack space, not stable. Pick a pivot, partition the array around it (smaller on left, greater on right), recurse on both sides. The worst case occurs on already-sorted input with a fixed pivot policy; randomized pivot selection (Chapter 12) makes the worst case essentially never hit. Quicksort wins when memory is tight (in-place partitioning) and stability does not matter. It is the dominant in-memory sort for primitives.
+---
 
-**Heap sort** — `O(n log n)` worst-case, `O(1)` auxiliary space, not stable. Build a max-heap (Chapter 3 §4), then repeatedly extract the maximum into the back of the array. Heap sort wins when worst-case bounds matter and memory is constrained. It loses to quicksort on average because cache behavior is worse — heap operations jump across the array — but the worst case is guaranteed.
+## The classical algorithms and what each one is actually for
 
-**Counting sort, radix sort, bucket sort** — non-comparison sorts. Counting sort runs in `O(n + k)` for `n` elements and `k` distinct keys; radix sort runs in `O(d(n + k))` for `d` digits per key. Both beat the `Ω(n log n)` lower bound for comparison sorts because they exploit structure (bounded key range, fixed-width keys). They win when keys are integers in a known small range. They lose when keys are arbitrary objects, when the key range is huge, or when the cache penalty of multiple passes over the data dominates.
+Six algorithms cover almost every working programmer's needs. The organizing principle is constraint: which properties of the problem does the algorithm require, and which does it sacrifice?
 
-## Why your standard library hybridizes
+**Insertion sort** is the algorithm that belongs at the base of every other sort. Take each element in sequence and shift it leftward into the sorted prefix until it lands in the right position. Worst case `O(n²)` on reverse-sorted input, best case `O(n)` on already-sorted input. For small subarrays — below 32 elements, roughly — insertion sort is faster than merge sort or quicksort in practice, because the constants are tiny and the access pattern is sequential and cache-friendly. No production sort ignores this. Every standard library calls insertion sort on small subarrays. It is not a toy algorithm; it is the algorithm that wins when the array is small enough that the `O(n log n)` factor has not yet dominated the constant.
 
-Three production sorts dominate the major language ecosystems. Each is a hybrid; none is one of the catalog algorithms in pure form.
+**Merge sort** divides the array in half, recursively sorts each half, then merges the two sorted halves into a single sorted sequence. Every element is touched once per level of recursion, and there are `log n` levels, giving `O(n log n)` in all cases — best, average, and worst. Merge sort requires `O(n)` auxiliary space for the merge buffer. It is stable: elements with equal keys preserve their original relative order. Stability is not a nicety when you are sorting database records by a secondary key and need the primary-key order preserved among ties. For that use case, merge sort — or a merge-based hybrid — is the right choice, and stability rules out quicksort.
 
-**Timsort** is CPython's `list.sort()` since version 2.3 (2002) [verify], Java's `Arrays.sort()` for objects since 7 (2011) [verify], and the basis for many other implementations. Timsort detects "natural runs" — already-sorted ascending or descending subsequences — and merges them. On real-world data, which is often partially sorted (timestamps, IDs, log entries), it approaches `O(n)` rather than `O(n log n)`. On unsorted input it falls back to merge sort. Subarrays below `MIN_RUN` (computed from input length, typically between 32 and 64) [verify] are sorted with binary insertion sort — the cache-locality argument from Chapter 2 §6.
+**Quicksort** picks a pivot, partitions the array around it (elements smaller than the pivot on the left, larger on the right), and recurses on both sides. Expected `O(n log n)`, worst case `O(n²)` when the pivot repeatedly lands at the extreme — as it does on already-sorted input with a fixed first-element pivot. Quicksort does the partitioning in-place, requiring only `O(log n)` stack space. It is not stable. On random data in RAM, quicksort's constants are better than merge sort's: the partition step has excellent cache behavior, touching the array sequentially from both ends toward the middle. The expected case is fast enough that production systems reaching for an in-place sort with no stability requirement default to quicksort or a quicksort-based hybrid.
 
-**Introsort** is the C++ standard library's `std::sort` and similar implementations. Introsort starts as quicksort, switches to heap sort when recursion depth exceeds `2 log₂ n` (preventing the `O(n²)` worst case), and switches to insertion sort for subarrays smaller than 16 [verify]. Three algorithms, one wrapper.
+**Heapsort** builds a max-heap from the input (Chapter 3 §4) and then repeatedly extracts the maximum, placing it at the back of the array. `O(n log n)` worst case, `O(1)` auxiliary space, not stable. Heapsort's theoretical properties are hard to beat: worst-case optimal, in-place. Its practical performance is worse than quicksort because heap operations jump across the array in a pattern that is hostile to the CPU's prefetcher. The useful case for heapsort is when you need a guaranteed bound and cannot tolerate quicksort's worst case — or when you need to extract the top-k elements without sorting everything, which is just k heap extractions: `O(n + k log n)`.
 
-**Dual-Pivot Quicksort** is the JDK's `Arrays.sort()` for primitive arrays since Java 7 (2011) [verify]. Two pivots partition the array into three regions, with insertion sort below 47 elements [verify]. Two pivots reduce the average comparison count by about 5% and improve cache behavior.
+**Counting sort and radix sort** break the `Ω(n log n)` comparison-sort lower bound by not comparing elements. Counting sort builds a frequency table of key values, then reconstructs the sorted output by walking the table. It runs in `O(n + k)` for `n` elements with `k` distinct key values. Radix sort processes keys digit by digit, stable-sorting on each digit from least significant to most. It runs in `O(d(n + k))` for keys of `d` digits in base `k`. Both algorithms win when keys are integers in a known bounded range. Both lose when keys are arbitrary objects — strings of unbounded length, composite keys, anything you cannot decompose into a fixed-width integer representation. The other failure mode is when `k` is large relative to `n`: counting sort on a billion-element array with ten billion distinct keys requires a ten-billion-slot table, and the memory access pattern for a large table destroys the cache advantage.
 
-The pattern: production sorts pay attention to constants, cache locality, and constraint-specific optimization. Asymptotic dominance is a necessary condition, not a sufficient one.
+<!-- → [TABLE: comparison of all six algorithms — columns: algorithm, best case, average case, worst case, auxiliary space, stable, wins when — reader sees the constraint matrix at a glance and uses it alongside the decision rules table below] -->
 
-## Cache eviction strategies
+---
 
-When fast memory is full and a new item arrives, an eviction policy decides which item leaves. The right choice depends on the workload's reuse pattern.
+## Why production sorts hybridize
 
-**LRU (Least Recently Used).** Evict the item accessed least recently. Implemented as a doubly-linked list plus a hash map: the map points to list nodes, the list keeps recency order, both updates are `O(1)`. LRU is the workhorse policy. It assumes recent access predicts future access — temporal locality — and most workloads honor that assumption.
+The three dominant production sorts are all hybrids. Understanding each one reveals what the engineers were solving for.
 
-**LFU (Least Frequently Used).** Evict the item with the lowest access count. Useful when popularity is more stable than recency: a CDN serving long-tail content has a stable set of popular items that should stay cached even if a recent burst of unique requests pushes them out under LRU.
+**Timsort** is CPython's `list.sort()` since 2002 and Java's `Arrays.sort()` for objects since Java 7. The core insight: real data is not random. Log files arrive roughly in timestamp order. User records were inserted in roughly alphabetical order. Sensor readings arrive in time order with occasional late arrivals. Data that humans or automated systems generate tends to have partially-sorted structure, because the processes that generated it had temporal or alphabetical ordering themselves.
 
-**FIFO (First-In, First-Out).** Evict the oldest item regardless of recent access. Simpler than LRU; performs worse on most workloads. Earns its place when implementation simplicity matters more than hit rate.
+Timsort detects natural runs — contiguous subsequences that are already sorted ascending or descending — and merges them. On data with long natural runs, the effective input size to the merge step is the number of runs, not the number of elements. In the extreme case of already-sorted data, Timsort runs in `O(n)`: one run, nothing to merge. On genuinely random data, run detection finds only short runs and falls back to standard merge behavior at `O(n log n)`. For subarrays below a threshold (computed from input size, typically 32–64 elements), Timsort calls binary insertion sort, getting the small-array advantage. The result is a sort that is fast on the inputs humans actually produce, competitive on random input, and stable throughout.
 
-**Random replacement.** Evict an item chosen uniformly at random. Surprisingly competitive on many real workloads — within a few percent of LRU — because the variance averages out at scale. Used in some hardware caches because the randomness defeats pathological access patterns and the implementation cost is near zero.
+**Introsort** is the algorithm behind C++'s `std::sort`. Three algorithms, one wrapper. It starts as quicksort — best-case and average-case behavior, good cache utilization. When the recursion depth exceeds `2 log₂ n`, it detects that the pivot selection has gone pathological and switches to heapsort, getting worst-case `O(n log n)` at the cost of slightly worse constants. For subarrays smaller than 16 elements, it switches to insertion sort. The result is an algorithm that captures quicksort's average-case speed, heapsort's worst-case guarantee, and insertion sort's small-array advantage, without any algorithm having to handle cases it is bad at.
 
-**ARC (Adaptive Replacement Cache).** Maintains two LRU-like lists, one for recently-once-accessed items and one for repeatedly-accessed items, plus ghost lists tracking recently-evicted items. The split adapts based on which kind of access is dominating. ARC outperforms LRU on workloads with mixed recency/frequency patterns. The patent situation — IBM held patents that expired around 2019 [verify] — slowed adoption; today, ARC and its descendants (CAR, CLOCK-Pro) appear in storage systems, including ZFS [verify] and PostgreSQL's experimental work.
+**Dual-pivot quicksort** is the JDK's `Arrays.sort()` for primitive arrays since Java 7. Instead of one pivot dividing the array into two regions, two pivots divide it into three. The average comparison count decreases by roughly 5%, and the three-region structure improves cache behavior slightly. For subarrays below 47 elements, it calls insertion sort. The engineering motivation was straightforward: the JVM is fast enough for object sorts to use Timsort, but primitive array sorts need better constants, and dual-pivot quicksort's constant is measurably better than single-pivot on random data.
 
-The eviction policy is one knob. Cache size is another. The relationship between them is non-linear — doubling the cache often improves hit rate non-trivially up to a knee, then plateaus. A workload that misses by 30% with a 1 GB cache may miss by 5% with a 4 GB cache and 4.8% with a 16 GB cache. Tune the size before tuning the policy.
+The pattern is consistent across all three. Asymptotic dominance is a necessary condition for being considered; it is not sufficient for winning in practice. What wins is a hybrid that matches each subproblem to the algorithm whose strengths fit that subproblem's profile.
+
+<!-- → [INFOGRAPHIC: three-panel diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as decision trees — each panel shows which sub-algorithm fires under which condition (input size, recursion depth, run detection) — student sees the hybridization logic visually rather than inferring it from prose] -->
+
+---
+
+## Caching and the same problem in different clothing
+
+Sorting and caching seem like different problems. They share a structure: both are strategies for managing the gap between slow memory and fast memory. Sorting manages it by arranging data so it can be accessed in order. Caching manages it by keeping the right data in the fast layer.
+
+A cache is a fixed-size buffer sitting between a slow data store — disk, network, remote memory — and a fast consumer. When the consumer asks for an item, the cache checks whether it has it (a hit) or needs to fetch it from the slow store (a miss). When the cache is full and a new item arrives, something must leave. The eviction policy is the algorithm.
+
+The theory here has an elegant result: the optimal eviction policy, if you know the future access sequence, is to evict the item that will be accessed farthest in the future (Bélády's algorithm, 1966). This is provably optimal and completely impractical — you do not know the future. All real policies are approximations, and they differ in what they use as a proxy for "likely to be needed soon."
+
+**LRU (Least Recently Used)** evicts the item accessed least recently. The proxy: recent access predicts future access — temporal locality. The implementation is a doubly-linked list plus a hash map, both updated in `O(1)` per access. LRU is the default and the right call for most workloads: it handles temporal locality well, it is `O(1)`, and its behavior is predictable.
+
+**LFU (Least Frequently Used)** evicts the item with the lowest access count. The proxy: frequent past access predicts future access — frequency locality. LFU wins on workloads with stable popularity distributions — a CDN serving video assets where the top 10% of content accounts for 90% of requests and that distribution changes slowly. LFU loses when a burst of unique items floods the cache and inflates their counts, displacing legitimately popular items.
+
+**FIFO (First-In, First-Out)** evicts the oldest item. No proxy about future access — just expiration by age. Simpler than LRU and worse on most workloads. The case for FIFO is implementation simplicity in constrained environments, or workloads where time-to-live matters more than access pattern.
+
+**Random replacement** evicts a uniformly random item. Surprisingly competitive — within a few percent of LRU on many real workloads — because the variance in miss rates averages out at scale. It is also immune to adversarial access patterns that deliberately cycle through items in a pattern that defeats LRU. Some hardware caches use randomized replacement because the implementation cost is near zero and it resists the pathological inputs that degrade deterministic policies.
+
+**ARC (Adaptive Replacement Cache)** maintains four lists: recently-once-accessed items (T1), recently-repeatedly-accessed items (T2), and two ghost lists of recently evicted items from each (B1, B2). When an evicted item in B1 is accessed, it signals that recency was more important; the cache grows T1 and shrinks T2. When an evicted item in B2 is accessed, it signals that frequency was more important; the cache grows T2 and shrinks T1. ARC self-tunes to the workload's recency/frequency balance without knowing the balance in advance. It consistently outperforms both LRU and LFU on mixed workloads. IBM held patents on ARC until around 2019; its descendants — CAR, CLOCK-Pro, W-TinyLFU (used in Caffeine, the default Java in-process cache) — are widely deployed in storage systems and application caches.
+
+<!-- → [INFOGRAPHIC: ARC four-list diagram showing T1, T2, B1, B2 with arrows indicating how a cache hit on B1 shifts the T1/T2 balance and a cache hit on B2 shifts it back — the self-tuning mechanism is invisible from prose alone] -->
+
+---
+
+## The cache-size interaction
+
+Eviction policy is one knob. Cache size is another. The two interact non-linearly, and getting the size wrong makes the policy choice irrelevant.
+
+The relationship between cache size and hit rate follows a characteristic shape: steep improvement up to a knee, then diminishing returns. A workload with a 5 GB hot working set may miss heavily at 1 GB, accept 80% of requests at 4 GB, and show almost no improvement from 8 GB to 16 GB. The knee is determined by the working set size, not by the cache size. If the cache is below the knee, more cache buys a lot. Above it, more cache buys almost nothing.
+
+The practical implication: profile the working set size before tuning the policy. A well-tuned LRU on a correctly-sized cache outperforms a perfectly-tuned ARC on an undersized one. The hierarchy of interventions is: (1) identify the working set size; (2) size the cache to cover it; (3) tune the policy to the access pattern. Engineers who skip to step 3 without doing steps 1 and 2 are optimizing the wrong thing.
+
+<!-- → [CHART: hit rate vs. cache size for a single workload — S-curve shape with the knee labeled at roughly the working-set size — student sees the non-linear interaction and understands why sizing precedes policy tuning] -->
+
+---
+
+## Failure modes: when "quicksort is always fastest" misleads
+
+The misconception is common enough to name directly: quicksort is always fastest. It is not.
+
+Quicksort has the best average-case constants among comparison sorts on random integer data fitting in RAM. That narrow statement is true. The general claim fails in four ways.
+
+First, adversarial input drives quicksort to `O(n²)`. Already-sorted input with a fixed first-element pivot is the canonical case — the pivot always lands at the extreme, partitions are maximally unbalanced, and every level of recursion processes one fewer element than the last. A web service that accepts user-supplied lists and calls a naive quicksort is vulnerable to a denial-of-service attack. Randomize the pivot (Chapter 12) or use introsort.
+
+Second, quicksort is not stable. A sort on a secondary key that uses quicksort destroys the primary-key ordering among equal secondary keys. Use merge sort or Timsort when stability is required.
+
+Third, on data that fits the non-comparison sort criteria — integer keys in a bounded range — radix sort beats quicksort decisively. Sorting one billion 32-bit integers, radix sort runs in a small number of linear passes. Quicksort runs in `O(n log n)` with a worse memory access pattern. The asymptotic argument does not save it.
+
+Fourth, on disk-resident data, quicksort's random access pattern is catastrophic. The right external-memory sort is multi-way merge, which keeps all its I/O sequential. Quicksort's pivoting across the array triggers random seeks on rotational storage and even on SSDs has worse throughput than streaming.
+
+The corrective: state the constraint, identify the algorithm that survives the constraint, verify with a benchmark on representative data. The standard library's choice is right for the default case. Depart from it when you have a specific constraint the standard library was not optimized for, and when you have measured that the departure helps.
+
+---
 
 ## Decision rules
 
-| Workload signature | Sort choice |
-| --- | --- |
-| Subarray smaller than ~32 | Insertion sort |
+These tables consolidate the chapter. They are for fast lookup after you have read the sections.
+
+| Constraint | Sort choice |
+|---|---|
+| Subarray smaller than ~32 elements | Insertion sort |
 | Stability required, memory available | Merge sort or Timsort |
-| Memory tight, stability irrelevant, average case matters | Quicksort (with randomized pivot) |
-| Worst-case bound required, memory tight | Heap sort or introsort |
-| Keys are integers in a small known range | Counting sort or radix sort |
+| Memory tight, stability irrelevant | Quicksort with randomized pivot |
+| Worst-case bound required, memory tight | Heapsort or introsort |
+| Integer keys in a small known range | Counting sort or radix sort |
 | Real-world partially-sorted data | Timsort |
-| Don't know — use language default | Standard library sort (almost always right) |
+| No special constraint | Standard library sort |
 
-| Workload signature | Cache policy |
-| --- | --- |
+| Access pattern | Cache policy |
+|---|---|
 | Strong temporal locality | LRU |
-| Stable popularity, long-tail | LFU |
-| Hardware-level cache, simplicity matters | Random or FIFO |
-| Mixed recency/frequency | ARC or CLOCK-Pro |
-| Don't know — measure before choosing | LRU as default; profile before tuning |
+| Stable popularity, long-tail distribution | LFU |
+| Hardware-level, simplicity required | Random or FIFO |
+| Mixed recency and frequency | ARC or W-TinyLFU |
+| Unknown — start here, then profile | LRU as default |
 
-## Worked example — two real cases
-
-### Case A — Why Timsort beats classical merge sort on real Python data
-
-A backend service ingests log entries arriving roughly in timestamp order, with occasional out-of-order events from clock drift. The service sorts batches of 100,000 entries before writing to long-term storage. The first implementation called classical merge sort. Profiling showed sort time was ~12% of batch runtime [verify].
-
-Switching to CPython's `list.sort()` cut sort time to ~2% [verify]. The reason: real log data is dominated by long natural ascending runs. Timsort detects runs of length ≥ `MIN_RUN` (typically 32–64) and merges them rather than splitting and re-sorting. On nearly-sorted input, Timsort approaches `O(n)`; on random input, it falls back to standard merge-sort behavior at `O(n log n)`.
-
-Three properties combine to make Timsort the right call. First, *natural-run detection*: it does not pay the `log n` factor on data it does not need to. Second, *stability*: equal timestamps preserve their original ordering, which matters when log entries within the same millisecond should retain ingestion order. Third, *cache behavior*: small subarrays use binary insertion sort, which streams through L1.
-
-The lesson: the asymptotic bound on classical merge sort was correct. The real-world workload had structure the bound did not exploit. The right algorithm exploited it.
-
-### Case B — Cache replacement in a CDN
-
-A CDN edge server caches static assets. A typical workload mixes long-tail popularity (a stable set of widely-requested objects) with bursts of unique requests (one-off hits, long URL tails, crawler traffic). With a 1 TB edge cache and a 5 GB working set of "always-warm" objects [verify], the policy choice has measurable consequences.
-
-Under LRU, a burst of unique requests evicts warm items. The next request for a warm item misses and is re-fetched. Hit rate is meaningfully lower than the working-set ratio would suggest.
-
-Under LFU, the burst increments counters for unique items but does not displace warm items unless the unique items are accessed repeatedly. Warm items stay cached. Hit rate improves on workloads where popularity is stable.
-
-Under ARC, the two-list structure separates "items accessed once recently" from "items accessed multiple times." Bursts populate the first list; warm items live in the second. Hit rate improves further on mixed workloads.
-
-The reported gains in published CDN literature are 10–30% in hit rate when moving from LRU to a recency+frequency-aware policy on appropriately-shaped workloads [verify]. The intervention pays back in reduced origin fetch traffic, lower bandwidth costs, and faster time-to-first-byte for end users.
-
-The lesson: the caching policy is not a one-size-fits-all decision. Profile the access pattern, identify the recency-frequency split, choose accordingly. A misconfigured LRU on a long-tail workload is a real source of cost.
-
-## Failure modes — when "quicksort is always fastest" misleads
-
-The misconception engaged: "Quicksort is always fastest."
-
-Quicksort has the best average-case constants among comparison sorts on random integer data fitting in RAM. That is the reading the misconception is built on. It is wrong as a universal claim.
-
-**Worst-case `O(n²)` on adversarial input.** Naive quicksort with a fixed pivot policy (first element, last element, middle element) can be driven to `O(n²)` by an adversary who controls the input. Already-sorted input with first-element pivot is the canonical example. A public web service that accepts user-supplied lists and sorts them is vulnerable. Mitigation: randomize the pivot (Chapter 12) or use introsort (which falls back to heap sort when recursion goes too deep).
-
-**No stability.** Equal keys do not preserve relative order. Database sorts on a secondary key require stability to honor a primary-key tiebreaker. Quicksort cannot be used directly; merge sort or Timsort is the right call.
-
-**Cache penalty on small data.** For subarrays below ~32 elements, the recursive overhead of quicksort exceeds the linear scan of insertion sort. Every production sort calls insertion sort at the leaves for this reason.
-
-**Loss to non-comparison sorts on bounded-range keys.** Sorting one billion 32-bit integers, radix sort runs in `O(n)` per pass with a small number of passes. Quicksort runs in `O(n log n)` with worse cache behavior. Radix sort wins on this specific shape.
-
-**Loss to merge sort on disk-resident data.** External-memory sorting prizes sequential access. Merge sort streams; quicksort jumps. The right external sort is multi-way merge.
-
-The corrective heuristic: state the constraint, identify the algorithm that survives the constraint, then verify with a benchmark on representative data. The standard library's choice is the right default; departures from the default need justification.
-
-## Cross-references
-
-For heap operations underlying heapsort, see Chapter 3 §4. For randomized quicksort and the analysis that justifies expected `O(n log n)`, see Chapter 12. For the master theorem applied to merge sort's recurrence, see Chapter 2 §4. For the cache-effects argument underlying every "production sort hybridizes" claim, see Chapter 2 §6.
-
-## Companion-page handoffs
-
-Benchmark suite comparing sorts on representative workloads (random integers, partially-sorted timestamps, near-duplicate strings, adversarial inputs); LRU, LFU, ARC, and CLOCK-Pro implementations with hit-rate harnesses; real cache-strategy tuning examples on workload traces; profiler-driven crossover analysis. Available at bearbrown.co/algorithms-by-bear-vol1/chapter-4.
+---
 
 ## What this chapter does not enable
 
-This chapter does not enable hardware-level cache optimization. CPU cache tuning — line size selection, associativity tuning, prefetcher behavior — is architecture-specific and lives in the optimization manuals from Intel and AMD, not in an algorithms reference. The chapter also does not cover external-memory algorithms in depth (multi-way merge, B-tree-based sorts, parallel external sort); for that, consult Vitter's *Algorithms and Data Structures for External Memory* or modern database internals texts.
+This chapter does not enable hardware-level cache tuning. CPU cache line optimization, prefetcher behavior, and NUMA-aware memory placement are architecture-specific and covered in vendor optimization manuals, not here. The chapter also does not cover external-memory sorting in depth — multi-way merge, B-tree-based sorts, parallel external sort. For that, Vitter's *Algorithms and Data Structures for External Memory* is the right reference.
+
+---
 
 ## Capability statement
 
-You can now choose an appropriate sorting algorithm given size, memory, distribution, and stability constraints; distinguish comparison sorts from non-comparison sorts and know when each wins; explain why your language's standard library hybridizes the way it does; pick a cache replacement strategy from access-pattern signals; and recognize when a workload deserves something more than the LRU default. The next time a sort or cache becomes the bottleneck, the diagnosis and the fix are in your hands.
+You can now match a sorting algorithm to a constraint — size, memory, distribution, stability, adversarial input — and explain why the match is right. You know why your standard library hybridizes the way it does and what each component of the hybrid is contributing. You can select a cache replacement policy from access-pattern signals, size the cache before tuning the policy, and recognize when a workload calls for something beyond the LRU default. When sorting or caching becomes the bottleneck, the diagnosis and the fix are in your hands.
 
+---
+
+## Exercises
+
+**Warm-up**
+
+1. Insertion sort has `O(n²)` worst-case complexity but `O(n)` best-case complexity. Describe the input that triggers each case, and explain why every production sort calls insertion sort on small subarrays despite the worst-case bound. *(Tests: understanding how best-case structure interacts with the small-array argument.)*
+
+2. Merge sort and quicksort both run in `O(n log n)` on average. Name two constraints under which you would choose merge sort over quicksort, and two under which you would choose quicksort over merge sort. For each, explain what property of the algorithm makes it the right match. *(Tests: reading the decision table through the lens of the sections, not just the table itself.)*
+
+3. The chapter says the `Ω(n log n)` lower bound applies to comparison sorts but not to counting sort or radix sort. What property of counting sort and radix sort allows them to escape the bound? Name a workload where counting sort wins and one where it loses despite the theoretically favorable bound. *(Tests: understanding the distinction between comparison-based and distribution-based sorting.)*
+
+**Application**
+
+4. You are building a service that sorts user-submitted lists of integers before storing them. A security researcher warns you that a naive sort could be exploited for a denial-of-service attack. Identify which sorting algorithm is vulnerable, describe the input that triggers the attack, and name two algorithmic fixes. *(Tests: applying the adversarial-input failure mode to a real production context.)*
+
+5. A team is sorting timestamped log entries arriving roughly in order, with occasional out-of-order events from clock drift. They are currently using a clean merge sort implementation and are considering switching to Python's `list.sort()`. Explain what Timsort does differently on this specific workload, and predict whether the switch will improve or degrade performance. *(Tests: applying the natural-run detection argument to a concrete workload.)*
+
+6. Use the decision tables to select an appropriate cache policy for each of the following workloads. For each, name the policy and explain which row of the table applies. (a) A social media feed renderer that caches the last 100 posts a user viewed. (b) A CDN where the top 5% of video assets account for 80% of traffic and that ratio is stable across weeks. (c) A CPU's L1 instruction cache, which must make eviction decisions in nanoseconds with no software overhead. *(Tests: translating access-pattern descriptions into policy selections using the decision framework.)*
+
+**Synthesis**
+
+7. The chapter argues that eviction policy and cache size interact non-linearly, and that engineers should tune size before policy. Construct a scenario in which a team tunes the policy without addressing size and gets a misleading result — a situation where their policy change appears to help when the underlying problem is sizing. Describe what measurement they would need to take to distinguish the two causes. *(Tests: understanding the cache-size/policy interaction as a diagnosis problem, not just a tuning problem.)*
+
+8. Introsort, Timsort, and dual-pivot quicksort each hybridize a different set of algorithms for a different reason. For each of the three, identify the single constraint it is solving that its primary algorithm cannot handle alone, and explain which component of the hybrid addresses that constraint. *(Tests: reading hybridization as intentional design, not accidental complexity.)*
+
+**Challenge**
+
+9. Bélády's optimal algorithm evicts the item accessed farthest in the future. It is provably optimal and completely impractical. Design a restricted real-world scenario in which an approximation to Bélády's algorithm becomes practical — a situation where partial knowledge of future accesses is available — and describe what eviction policy you would derive from that knowledge. Identify the failure mode your policy would inherit from the limitations of that partial knowledge. *(Tests: reasoning about the theory-practice gap in cache policy design; applying the structure of the chapter's theoretical framing to a novel case.)*
 
 ---
 
