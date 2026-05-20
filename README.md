@@ -202,3 +202,69 @@ When all chapters are `revised`, the book is ready for KDP submission.
 ---
 
 _Generated overview-and-TOC README. Source files (`book.md`, `outline.md`, etc.) remain the working documents._
+
+---
+
+## What This Book Is
+
+<!-- TODO: populate from chapter content -->
+
+---
+
+## Who This Book Is For
+
+reader's roadmap)
+
+This file is a stub. Sections 1–10 and 12–13 are placeholders for a later pass.
+Section 11 (A note about AI) is substantive and written.
+
+A good model for the full version: Pearl's "The Mind Over Data" introduction,
+Molnar's Interpretable ML introduction. Both are argument-first and tell the
+reader exactly what to expect from each chapter.
+-->
+
+# Introduction
+
+<!-- [1] COLD OPEN
+     A specific named scene with real stakes.
+     No "this book will...", no throat-clearing.
+
+---
+
+## How to Read It
+
+<!-- TODO: populate from chapter content -->
+
+---
+
+## Signature Simulations
+
+<!-- TODO: populate from chapter content -->
+
+---
+
+## About the Author
+
+**Nik Bear Brown** is an Associate Teaching Professor at Northeastern University's College of Engineering, where he has taught algorithms, AI, data science, and visualization for more than a decade. His PhD in Computer Science is from UCLA, with a major field in computational and systems biology and minor fields in artificial intelligence and statistics.
+
+Selected courses include **INFO 6205: Program Structure and Algorithms** — also a 13-module Coursera course — alongside CSYE 7270 (Virtual Environments and Real-Time 3D), INFO 7390 (Advances in Data Sciences), and ENGR 0201 (AI Fluency Certificate). He is the author of the *with LLMs* textbook series and founder of [Humanitarians AI](https://www.humanitarians.ai/).
+
+He works in Boston. [nikbearbrown.com](https://www.nikbearbrown.com) · [irreducibly.xyz](https://irreducibly.xyz) · [skepticism.ai](https://www.skepticism.ai)
+
+---
+
+## Copyright
+
+Copyright © 2026 Nik Bear Brown. All rights reserved.
+
+Published by Bear Brown, LLC.
+
+No part of this publication may be reproduced, distributed, or transmitted in
+any form or by any means without the prior written permission of the publisher,
+except in the case of brief quotations in critical reviews and certain other
+noncommercial uses permitted by copyright law.
+
+ISBN: [INSERT ISBN]
+
+First edition: 2026
+
