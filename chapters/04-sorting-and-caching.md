@@ -24,7 +24,8 @@ What the lower bound does not tell you: which algorithm is fastest on your speci
 
 This is the gap between the theory and the engineering. The theory tells you no comparison sort can do better than `O(n log n)` in the worst case. The engineering asks what structure your data actually has, and finds an algorithm that exploits it. Timsort is the canonical answer to that question for general-purpose sorting.
 
-<!-- → [CHART: two curves on the same axes — merge sort vs. insertion sort runtime as a function of n from 4 to 512 — crossover visible around n=32; student sees why every production sort calls insertion sort on small subarrays] -->
+![Two curves on the same axes ](images/04-sorting-and-caching-fig-01.png)
+*Figure 4.1 — Two curves on the same axes *
 
 ---
 
@@ -42,7 +43,9 @@ Six algorithms cover almost every working programmer's needs. The organizing pri
 
 **Counting sort and radix sort** break the `Ω(n log n)` comparison-sort lower bound by not comparing elements. Counting sort builds a frequency table of key values, then reconstructs the sorted output by walking the table. It runs in `O(n + k)` for `n` elements with `k` distinct key values. Radix sort processes keys digit by digit, stable-sorting on each digit from least significant to most. It runs in `O(d(n + k))` for keys of `d` digits in base `k`. Both algorithms win when keys are integers in a known bounded range. Both lose when keys are arbitrary objects — strings of unbounded length, composite keys, anything you cannot decompose into a fixed-width integer representation. The other failure mode is when `k` is large relative to `n`: counting sort on a billion-element array with ten billion distinct keys requires a ten-billion-slot table, and the memory access pattern for a large table destroys the cache advantage.
 
-<!-- → [TABLE: comparison of all six algorithms — columns: algorithm, best case, average case, worst case, auxiliary space, stable, wins when — reader sees the constraint matrix at a glance and uses it alongside the decision rules table below] -->
+| algorithm | best case | average case | worst case | auxiliary space |
+| --- | --- | --- | --- | --- |
+| , wins when | reader sees the constraint matrix at a glance and uses it alongside the decision rules table below | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -60,7 +63,8 @@ Timsort detects natural runs — contiguous subsequences that are already sorted
 
 The pattern is consistent across all three. Asymptotic dominance is a necessary condition for being considered; it is not sufficient for winning in practice. What wins is a hybrid that matches each subproblem to the algorithm whose strengths fit that subproblem's profile.
 
-<!-- → [INFOGRAPHIC: three-panel diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as decision trees — each panel shows which sub-algorithm fires under which condition (input size, recursion depth, run detection) — student sees the hybridization logic visually rather than inferring it from prose] -->
+![Diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as](images/04-sorting-and-caching-fig-02.png)
+*Figure 4.2 — Diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as*
 
 ---
 
@@ -82,7 +86,8 @@ The theory here has an elegant result: the optimal eviction policy, if you know 
 
 **ARC (Adaptive Replacement Cache)** maintains four lists: recently-once-accessed items (T1), recently-repeatedly-accessed items (T2), and two ghost lists of recently evicted items from each (B1, B2). When an evicted item in B1 is accessed, it signals that recency was more important; the cache grows T1 and shrinks T2. When an evicted item in B2 is accessed, it signals that frequency was more important; the cache grows T2 and shrinks T1. ARC self-tunes to the workload's recency/frequency balance without knowing the balance in advance. It consistently outperforms both LRU and LFU on mixed workloads. IBM held patents on ARC until around 2019; its descendants — CAR, CLOCK-Pro, W-TinyLFU (used in Caffeine, the default Java in-process cache) — are widely deployed in storage systems and application caches.
 
-<!-- → [INFOGRAPHIC: ARC four-list diagram showing T1, T2, B1, B2 with arrows indicating how a cache hit on B1 shifts the T1/T2 balance and a cache hit on B2 shifts it back — the self-tuning mechanism is invisible from prose alone] -->
+![ARC four-list diagram showing T1, T2, B1, B2](images/04-sorting-and-caching-fig-03.png)
+*Figure 4.3 — ARC four-list diagram showing T1, T2, B1, B2*
 
 ---
 
@@ -94,7 +99,8 @@ The relationship between cache size and hit rate follows a characteristic shape:
 
 The practical implication: profile the working set size before tuning the policy. A well-tuned LRU on a correctly-sized cache outperforms a perfectly-tuned ARC on an undersized one. The hierarchy of interventions is: (1) identify the working set size; (2) size the cache to cover it; (3) tune the policy to the access pattern. Engineers who skip to step 3 without doing steps 1 and 2 are optimizing the wrong thing.
 
-<!-- → [CHART: hit rate vs. cache size for a single workload — S-curve shape with the knee labeled at roughly the working-set size — student sees the non-linear interaction and understands why sizing precedes policy tuning] -->
+![Hit rate vs](images/04-sorting-and-caching-fig-04.png)
+*Figure 4.4 — Hit rate vs*
 
 ---
 
@@ -256,3 +262,45 @@ simulator`.
 **Connection to previous chapters:** Imports `harness` from Chapter 2 and `MinHeap` from Chapter 3.
 
 **Preview of next chapter:** Chapter 5 implements graph representations and the four classical shortest-path algorithms, with a worked routing example you can compare across Dijkstra, Bellman-Ford, and A*.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 4.1 — Two curves on the same axes 
+
+Create a standalone D3 v7 HTML file for Figure Two curves on the same axes . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: two curves on the same axes — merge sort vs. insertion sort runtime as a function of n from 4 to 512 — crossover visible around n=32; student sees why every production sort calls insertion sort on small subarrays. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/04-sorting-and-caching-fig-01.html`
+
+---
+
+### Figure 4.2 — Diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as
+
+Create a standalone D3 v7 HTML file for Figure Diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: three-panel diagram showing Timsort, Introsort, and Dual-Pivot Quicksort as decision trees — each panel shows which sub-algorithm fires under which condition (input size, recursion depth, run detection) — student sees the hybridization logic visually rather than inferring it from prose. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/04-sorting-and-caching-fig-02.html`
+
+---
+
+### Figure 4.3 — ARC four-list diagram showing T1, T2, B1, B2
+
+Create a standalone D3 v7 HTML file for Figure ARC four-list diagram showing T1, T2, B1, B2. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: ARC four-list diagram showing T1, T2, B1, B2 with arrows indicating how a cache hit on B1 shifts the T1/T2 balance and a cache hit on B2 shifts it back — the self-tuning mechanism is invisible from prose alone. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/04-sorting-and-caching-fig-03.html`
+
+---
+
+### Figure 4.4 — Hit rate vs
+
+Create a standalone D3 v7 HTML file for Figure Hit rate vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: hit rate vs. cache size for a single workload — S-curve shape with the knee labeled at roughly the working-set size — student sees the non-linear interaction and understands why sizing precedes policy tuning. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/04-sorting-and-caching-fig-04.html`

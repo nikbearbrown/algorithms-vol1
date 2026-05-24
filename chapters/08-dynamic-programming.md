@@ -20,7 +20,8 @@ The second is *overlapping subproblems*. The same subproblems appear repeatedly 
 
 Dynamic programming collapses that redundancy. Compute each subproblem once. Store the result. When you need it again, look it up.
 
-<!-- → [IMAGE: recursion tree for F(6) — show the full binary tree with each node labeled F(k); highlight duplicate subtrees in a distinct color (F(4) appears twice, F(3) three times, F(2) five times); annotate total node count as O(2ⁿ) vs. distinct subproblems as n; student should see viscerally why the redundancy is exponential and why caching collapses it to linear] -->
+![Recursion tree for F(6) ](images/08-dynamic-programming-fig-01.png)
+*Figure 8.1 — Recursion tree for F(6) *
 
 A third thing worth checking is that the subproblem space is manageable. DP works when the number of distinct subproblems is polynomial. For the longest common subsequence of two strings of lengths `m` and `n`, there are `mn` distinct subproblems — fine. For the traveling salesman problem with bitmask states, there are `n · 2ⁿ` subproblems — still exponential, but manageable up to about `n = 25`. For problems whose subproblem space is genuinely exponential with no compressible structure, DP won't save you.
 
@@ -40,7 +41,8 @@ The actual skill in dynamic programming is not implementing the algorithm — on
 
 The recurrence is the artifact. If the recurrence is right, the rest is just filling in a table.
 
-<!-- → [INFOGRAPHIC: the four-step recurrence design process as a vertical flow — (1) Define subproblem: annotate that the definition must name the state precisely, show a good vs. bad example side by side; (2) Write recurrence: show the min/max branching structure; (3) Base cases: flag this as where most bugs live; (4) Evaluation order: branch to top-down and bottom-up; student should be able to use this as a checklist when designing their first recurrence] -->
+![The four-step recurrence design process as a vertical](images/08-dynamic-programming-fig-02.png)
+*Figure 8.2 — The four-step recurrence design process as a vertical*
 
 ---
 
@@ -58,7 +60,11 @@ The bottom-up approach has lower overhead — it's just array accesses in a loop
 
 In practice: top-down for prototyping and correctness, bottom-up for production when speed or memory is the constraint. For most problems the choice is stylistic. For very large inputs where space optimization matters, bottom-up wins.
 
-<!-- → [TABLE: top-down vs. bottom-up comparison — rows: implementation form, subproblems computed, recursion overhead, space optimization ease, best used when; fill each cell concisely; student should be able to make the choice in under a minute for a new problem] -->
+| Item | Meaning |
+| --- | --- |
+| implementation form, subproblems computed, recursion overhead, space optimization ease, best used when | A concrete checkpoint for applying the chapter concept. |
+| fill each cell concisely | A concrete checkpoint for applying the chapter concept. |
+| student should be able to make the choice in under a minute for a new problem | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -86,7 +92,8 @@ where `[A[i] ≠ B[j]]` is 1 if the characters differ and 0 if they match.
 
 Fill in an `(m+1) × (n+1)` table, where `m` and `n` are the string lengths. Every cell looks left, up, and diagonally up-left. The answer is in the bottom-right corner.
 
-<!-- → [IMAGE: fully filled edit distance table for "kitten" vs "sitting" (7×8 grid) — annotate the base case row and column; trace the three arrow directions (left=insert, up=delete, diagonal=substitute/match) from one interior cell; highlight the traceback path from bottom-right to top-left that recovers the optimal alignment; student should be able to read off the edit operations from the path and verify the count of 6] -->
+![Fully filled edit distance table for "kitten" vs](images/08-dynamic-programming-fig-03.png)
+*Figure 8.3 — Fully filled edit distance table for "kitten" vs*
 
 Time: `O(mn)`. Space: `O(mn)` for the full table, or `O(min(m, n))` if you only need the distance and not the alignment — because each row depends only on the previous row, you can alternate between two arrays.
 
@@ -102,7 +109,8 @@ The `O(mn)` table for edit distance is fine when `m` and `n` are thousands. When
 
 The space optimization exploits a simple observation: the recurrence for row `i` reads only from row `i-1`. You don't need the entire table. Keep two arrays — the current row and the previous row — and alternate. Memory drops from `O(mn)` to `O(min(m, n))`.
 
-<!-- → [IMAGE: side-by-side comparison of full table vs. two-row optimization for the same edit distance computation — left: full (m+1)×(n+1) grid with all cells filled, shaded to show that only the last two rows are ever read; right: two horizontal arrays labeled "prev" and "curr" alternating, with arrows showing which cells feed into the current computation; annotate memory cost of each; student should see exactly what is discarded and what is retained] -->
+![Comparison of full table vs](images/08-dynamic-programming-fig-04.png)
+*Figure 8.4 — Comparison of full table vs*
 
 The cost is that you lose the ability to reconstruct the optimal alignment. With the full table you can trace back from `OPT(m, n)` to `OPT(0, 0)`, following the choices that produced the minimum at each cell, and recover the actual edit sequence. With two rows you only have the final distance, not the path.
 
@@ -126,7 +134,11 @@ There is a small set of DP patterns that recur across a wide range of problems. 
 
 **Graph DP: Bellman-Ford and Floyd-Warshall.** Bellman-Ford computes single-source shortest paths with possible negative edges by iterating over `(vertex, iteration)` pairs — the subproblem is "shortest path to vertex `v` using at most `k` edges." Floyd-Warshall computes all-pairs shortest paths via `OPT(i, j, k)` — shortest path from `i` to `j` using only intermediate vertices from the set `{1, ..., k}`. Chapter 5 covers both in the context of graph algorithms; the DP framing is what makes them correct on negative-weight graphs.
 
-<!-- → [TABLE: DP pattern catalog — rows: 1D sequence, 2D two-sequence, 2D interval, 0/1 knapsack, bitmask subsets, graph DP; columns: subproblem definition form, table shape, fill order, canonical example, time complexity; student should be able to match an unfamiliar problem to its pattern by reading down the "subproblem definition form" column] -->
+| subproblem definition form | table shape | fill order | canonical example | time complexity |
+| --- | --- | --- | --- | --- |
+| 1D sequence, 2D two-sequence, 2D interval, 0 | 1 knapsack, bitmask subsets, graph DP | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. | A concrete checkpoint for applying the chapter concept. |
+| columns: subproblem definition form, table shape, fill order, canonical example, time complexity | Use the chapter example as the concrete test case. | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. | A concrete checkpoint for applying the chapter concept. |
+| student should be able to match an unfamiliar problem to its pattern by reading down the "subproblem definition form" column | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -341,3 +353,45 @@ study`.
 **Connection to previous chapters:** Imports `harness` from Chapter 2. The fibonacci comparison reinforces the recurrence analysis from Chapter 7.
 
 **Preview of next chapter:** Chapter 9 implements network flow — max-flow via Ford-Fulkerson and Edmonds-Karp — and the canonical bipartite-matching reduction that turns "match workers to jobs" into "push flow through a graph."
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 8.1 — Recursion tree for F(6) 
+
+Create a standalone D3 v7 HTML file for Figure Recursion tree for F(6) . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: recursion tree for F(6) — show the full binary tree with each node labeled F(k); highlight duplicate subtrees in a distinct color (F(4) appears twice, F(3) three times, F(2) five times); annotate total node count as O(2ⁿ) vs. distinct subproblems as n; student should see viscerally why the redundancy is exponential and why caching collapses it to linear. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/08-dynamic-programming-fig-01.html`
+
+---
+
+### Figure 8.2 — The four-step recurrence design process as a vertical
+
+Create a standalone D3 v7 HTML file for Figure The four-step recurrence design process as a vertical. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: the four-step recurrence design process as a vertical flow — (1) Define subproblem: annotate that the definition must name the state precisely, show a good vs. bad example side by side; (2) Write recurrence: show the min/max branching structure; (3) Base cases: flag this as where most bugs live; (4) Evaluation order: branch to top-down and bottom-up; student should be able to use this as a checklist when designing their first recurrence. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/08-dynamic-programming-fig-02.html`
+
+---
+
+### Figure 8.3 — Fully filled edit distance table for "kitten" vs
+
+Create a standalone D3 v7 HTML file for Figure Fully filled edit distance table for "kitten" vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: fully filled edit distance table for "kitten" vs "sitting" (7×8 grid) — annotate the base case row and column; trace the three arrow directions (left=insert, up=delete, diagonal=substitute/match) from one interior cell; highlight the traceback path from bottom-right to top-left that recovers the optimal alignment; student should be able to read off the edit operations from the path and verify the count of 6. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/08-dynamic-programming-fig-03.html`
+
+---
+
+### Figure 8.4 — Comparison of full table vs
+
+Create a standalone D3 v7 HTML file for Figure Comparison of full table vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: side-by-side comparison of full table vs. two-row optimization for the same edit distance computation — left: full (m+1)×(n+1) grid with all cells filled, shaded to show that only the last two rows are ever read; right: two horizontal arrays labeled "prev" and "curr" alternating, with arrows showing which cells feed into the current computation; annotate memory cost of each; student should see exactly what is discarded and what is retained. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/08-dynamic-programming-fig-04.html`

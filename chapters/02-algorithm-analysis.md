@@ -6,7 +6,8 @@
 
 Here is a question that sounds simple until you sit with it: how do you know, before you run a program, whether it will finish in a second or a year?
 
-<!-- → [CHART: line chart showing wall-clock time vs. input size n for a concrete O(n) algorithm, e.g. linear scan on a list — student should see that doubling n roughly doubles time, grounding the proportionality intuition before the formal definition appears] -->
+![Line chart showing wall-clock time vs](images/02-algorithm-analysis-fig-01.png)
+*Figure 2.1 — Line chart showing wall-clock time vs*
 
 Not roughly. Not "it seems fast." Actually know, with an argument you could defend, that this particular approach to the problem scales and that one doesn't.
 
@@ -32,7 +33,8 @@ The formal definition, which I'll give you because it's worth having, says: `T(n
 
 The shape is what survives. Everything else is a detail.
 
-<!-- → [INFOGRAPHIC: visual breakdown of the formal Big O definition — annotate T(n) ≤ c·f(n) for all n ≥ n₀ with callouts labeling each component: "c absorbs machine speed, language, memory layout"; "n₀ is the threshold past which the bound holds"; "f(n) is the shape that survives" — student should see exactly what the constants are hiding] -->
+![Visual breakdown of the formal Big O definition](images/02-algorithm-analysis-fig-02.png)
+*Figure 2.2 — Visual breakdown of the formal Big O definition*
 
 ---
 
@@ -50,7 +52,9 @@ In casual conversation — including, honestly, in textbooks — "O" often does 
 
 I'll try to use them precisely, and flag when I'm simplifying.
 
-<!-- → [TABLE: three-column reference — notation (O, Ω, Θ), question it answers, when to reach for it — e.g. Ω row: "lower bound", "proving no algorithm can do better", "comparison-sort floor argument" — student should be able to pick the right notation for a given claim] -->
+| Item | Meaning |
+| --- | --- |
+| "lower bound", "proving no algorithm can do better", "comparison-sort floor argument" | student should be able to pick the right notation for a given claim |
 
 ---
 
@@ -72,7 +76,8 @@ From cheapest to most expensive:
 
 `O(2ⁿ)` and `O(n!)` — exponential and factorial. These describe algorithms that enumerate all possible combinations or permutations of the input. They are essentially off the table for any non-trivial `n`. Chapter 10 covers why certain problems seem to force you into this territory and what you can do about it.
 
-<!-- → [CHART: log-scale plot of all seven growth classes from O(1) to O(n!) evaluated at n = 1 through n = 30 — student should see that the curves are indistinguishable at small n and diverge catastrophically past n = 20; this is the visceral argument for why growth class matters more than constants at scale] -->
+![Log-scale plot of all seven growth classes from](images/02-algorithm-analysis-fig-03.png)
+*Figure 2.3 — Log-scale plot of all seven growth classes from*
 
 ---
 
@@ -102,7 +107,8 @@ A reference card with the master theorem applied to the standard recurrences is 
 
 When the master theorem doesn't apply — when the split is unequal, or the recurrence is irregular — the *recursion tree method* is your fallback. Draw the tree. Label the work at each level. Sum across levels. For instance, the recurrence `T(n) = T(n/3) + T(2n/3) + n` has unequal splits, so the master theorem doesn't fit directly. But the recursion tree shows that each level sums to `n` (even though the tree is unbalanced), and the tree has `O(log n)` levels, so the total is `Θ(n log n)`.
 
-<!-- → [IMAGE: recursion tree for T(n) = T(n/3) + T(2n/3) + n — show the unbalanced tree with level-by-level work labeled; annotate that each level still sums to n despite the imbalance; label the depth as O(log n) — student should see why an irregular split doesn't change the answer here and understand the recursion tree method as a visual proof technique] -->
+![Recursion tree for T(n) = T(n/3) + T(2n/3)](images/02-algorithm-analysis-fig-04.png)
+*Figure 2.4 — Recursion tree for T(n) = T(n/3) + T(2n/3)*
 
 ---
 
@@ -120,7 +126,8 @@ The canonical example is the dynamic array — a list that doubles its underlyin
 
 The expensive operation is real. But you pay for it in installments across the cheap operations that follow, and the average works out to constant time.
 
-<!-- → [CHART: bar chart showing per-operation cost of n append operations on a dynamic array — x-axis is operation number 1..n, y-axis is cost; cheap O(1) appends appear as short bars, resize events appear as tall spikes at powers of 2; amortized cost shown as a flat horizontal line at O(1) — student should see visually that the spikes are real but infrequent enough that the average stays constant] -->
+![Bar chart showing per-operation cost of n append](images/02-algorithm-analysis-fig-05.png)
+*Figure 2.5 — Bar chart showing per-operation cost of n append*
 
 Three methods exist for proving amortized bounds more carefully: the *aggregate method* (total the cost, divide by operations), the *accounting method* (charge each operation a fixed amortized cost and save the surplus for later), and the *potential method* (define a potential function that acts like a "stored energy" in the data structure, funding expensive operations from the energy accumulated during cheap ones). Chapter 3 works through all three on the dynamic table.
 
@@ -132,7 +139,9 @@ Modern computers have a memory hierarchy. Registers, sitting inside the processo
 
 The ratio between L1 and main memory is roughly 100:1 in latency. A program that hits L1 for every access runs about a hundred times faster than a program that misses to main memory on every access, holding instruction count constant.
 
-<!-- → [TABLE: memory hierarchy reference — columns: level, approximate latency, approximate size; rows: registers, L1 cache, L2 cache, L3 cache, main memory, SSD, HDD — student should internalize the 100× gap between L1 and main memory that makes cache behavior decisive at production scale] -->
+| level | approximate latency | approximate size |
+| --- | --- | --- |
+| registers, L1 cache, L2 cache, L3 cache, main memory, SSD, HDD | student should internalize the 100× gap between L1 and main memory that makes cache behavior decisive at production scale | A concrete checkpoint for applying the chapter concept. |
 
 Asymptotic analysis counts instructions. It does not count cache misses.
 
@@ -144,7 +153,8 @@ Why? At `n = 32`, the elements fit in a few cache lines — a few hundred bytes 
 
 This is why every production sort library is a hybrid. Python's Timsort delegates to binary insertion sort on runs shorter than a threshold (typically 32 to 64 elements, computed from input length). The JDK's dual-pivot quicksort switches to insertion sort below a threshold around 47. GNU's `std::sort` inserts below 16. The asymptotic bound governs behavior at large `n`; the constants govern behavior at small `n`; the crossover point is found empirically and baked in as a constant.
 
-<!-- → [CHART: wall-clock time vs. n for insertion sort and merge sort on the same machine, n ranging from 1 to 200 — show the crossover point where merge sort's line dips below insertion sort's; annotate the crossover region with the library thresholds (16, 32–64, 47); student should see that the O(n²) algorithm genuinely wins at small n and understand why hybrid sorts exist] -->
+![Wall-clock time vs](images/02-algorithm-analysis-fig-06.png)
+*Figure 2.6 — Wall-clock time vs*
 
 The misconception worth naming: "`O(n log n)` is always good enough." It is good enough as an asymptotic class when you're sorting unstructured input at scale. It is not a substitute for thinking. Three ways this goes wrong:
 
@@ -345,3 +355,61 @@ actual benchmark output, not invented.
 **Connection to previous chapters:** Builds in the directory created by Chapter 1's exercise. Populates the decision-card template Chapter 1 produced.
 
 **Preview of next chapter:** Chapter 3 implements the canonical data structures from scratch and uses the harness you just built to verify each structure's operation-cost claims empirically.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 2.1 — Line chart showing wall-clock time vs
+
+Create a standalone D3 v7 HTML file for Figure Line chart showing wall-clock time vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: line chart showing wall-clock time vs. input size n for a concrete O(n) algorithm, e.g. linear scan on a list — student should see that doubling n roughly doubles time, grounding the proportionality intuition before the formal definition appears. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/02-algorithm-analysis-fig-01.html`
+
+---
+
+### Figure 2.2 — Visual breakdown of the formal Big O definition
+
+Create a standalone D3 v7 HTML file for Figure Visual breakdown of the formal Big O definition. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: visual breakdown of the formal Big O definition — annotate T(n) ≤ c·f(n) for all n ≥ n₀ with callouts labeling each component: "c absorbs machine speed, language, memory layout"; "n₀ is the threshold past which the bound holds"; "f(n) is the shape that survives" — student should see exactly what the constants are hiding. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/02-algorithm-analysis-fig-02.html`
+
+---
+
+### Figure 2.3 — Log-scale plot of all seven growth classes from
+
+Create a standalone D3 v7 HTML file for Figure Log-scale plot of all seven growth classes from. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: log-scale plot of all seven growth classes from O(1) to O(n!) evaluated at n = 1 through n = 30 — student should see that the curves are indistinguishable at small n and diverge catastrophically past n = 20; this is the visceral argument for why growth class matters more than constants at scale. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/02-algorithm-analysis-fig-03.html`
+
+---
+
+### Figure 2.4 — Recursion tree for T(n) = T(n/3) + T(2n/3)
+
+Create a standalone D3 v7 HTML file for Figure Recursion tree for T(n) = T(n/3) + T(2n/3). Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: recursion tree for T(n) = T(n/3) + T(2n/3) + n — show the unbalanced tree with level-by-level work labeled; annotate that each level still sums to n despite the imbalance; label the depth as O(log n) — student should see why an irregular split doesn't change the answer here and understand the recursion tree method as a visual proof technique. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/02-algorithm-analysis-fig-04.html`
+
+---
+
+### Figure 2.5 — Bar chart showing per-operation cost of n append
+
+Create a standalone D3 v7 HTML file for Figure Bar chart showing per-operation cost of n append. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: bar chart showing per-operation cost of n append operations on a dynamic array — x-axis is operation number 1..n, y-axis is cost; cheap O(1) appends appear as short bars, resize events appear as tall spikes at powers of 2; amortized cost shown as a flat horizontal line at O(1) — student should see visually that the spikes are real but infrequent enough that the average stays constant. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/02-algorithm-analysis-fig-05.html`
+
+---
+
+### Figure 2.6 — Wall-clock time vs
+
+Create a standalone D3 v7 HTML file for Figure Wall-clock time vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: wall-clock time vs. n for insertion sort and merge sort on the same machine, n ranging from 1 to 200 — show the crossover point where merge sort's line dips below insertion sort's; annotate the crossover region with the library thresholds (16, 32–64, 47); student should see that the O(n²) algorithm genuinely wins at small n and understand why hybrid sorts exist. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/02-algorithm-analysis-fig-06.html`

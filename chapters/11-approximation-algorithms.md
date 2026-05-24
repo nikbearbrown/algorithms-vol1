@@ -22,7 +22,8 @@ For a minimization problem, the guarantee says: for every input, the algorithm's
 
 The ratio is a *worst-case* bound over all possible inputs. It tells you that no adversary, however cleverly they construct an input, can make the algorithm do worse than `α · OPT`. What it does not tell you is how the algorithm performs on *your specific* input. Your input might produce a solution much closer to optimal. Or it might hit the worst case exactly. The ratio alone cannot distinguish between these. This distinction — between the worst-case bound and the typical-case performance — is the most important thing to understand about approximation algorithms, and I will return to it.
 
-<!-- → [INFOGRAPHIC: two-panel diagram illustrating the approximation contract — left panel: number line from OPT to α·OPT, with "algorithm's solution lands somewhere in here" shaded and a question mark indicating the algorithm's actual output position within the range; right panel: two sample instances, one where the algorithm hits near OPT, one where it hits near α·OPT — student should see that the ratio defines the ceiling, not the landing spot] -->
+![Diagram illustrating the approximation contract ](images/11-approximation-algorithms-fig-01.png)
+*Figure 11.1 — Diagram illustrating the approximation contract *
 
 ---
 
@@ -40,7 +41,11 @@ A **logarithmic-factor approximation** has a ratio that grows slowly with input 
 
 Some NP-hard problems cannot be approximated within any constant factor unless P = NP. Maximum clique cannot be approximated within `n^(1−ε)` for any `ε > 0` under standard complexity assumptions. For these problems, no polynomial-time algorithm with a useful guarantee exists. The boundary between approximable and inapproximable is itself a deep mathematical structure — the PCP theorem is the machinery that produces most inapproximability results — but for a practitioner, the relevant fact is simpler: check the literature before investing in an approximation algorithm that cannot exist.
 
-<!-- → [TABLE: approximation guarantee hierarchy — rows: constant-factor, PTAS, FPTAS, logarithmic-factor, inapproximable; columns: guarantee form, running time dependence on ε, canonical example, what makes it stronger than the row above; student should be able to classify a new guarantee they encounter by reading down the "guarantee form" column] -->
+| guarantee form | running time dependence on ε | canonical example | what makes it stronger than the row above |
+| --- | --- | --- | --- |
+| constant-factor, PTAS, FPTAS, logarithmic-factor, inapproximable | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. | A specific, evidence-linked version that readers can verify. |
+| columns: guarantee form, running time dependence on ε, canonical example, what makes it stronger than the row above | Use the chapter example as the concrete test case. | Use the chapter example as the concrete test case. | A specific, evidence-linked version that readers can verify. |
+| student should be able to classify a new guarantee they encounter by reading down the "guarantee form" column | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. | A specific, evidence-linked version that readers can verify. |
 
 ---
 
@@ -54,7 +59,8 @@ Most approximation algorithms are built from one of three templates. Recognizing
 
 **DP rounding for FPTAS.** When a problem has a pseudo-polynomial DP solution — one whose running time is polynomial in the numeric values of the inputs — rounding the input values to a coarser precision produces a polynomial-time algorithm with a `(1 + ε)` guarantee. The trick: round each value down to the nearest multiple of some threshold Δ that depends on `ε` and the optimal value. The rounded problem has fewer distinct values, the DP table shrinks, and the error introduced by rounding is bounded by a function of `ε`. The 0/1 knapsack FPTAS works exactly this way.
 
-<!-- → [IMAGE: three-template diagram for approximation algorithm design — three horizontal lanes labeled "Greedy + charging", "LP relax + round", "DP round for FPTAS"; each lane contains: (1) the key idea in one sentence, (2) what provides the lower bound for the ratio proof, (3) canonical example problem; arrows connect the canonical example to its ratio; student should be able to match a new algorithm they read about to its design template] -->
+![Three-template diagram for approximation algorithm design ](images/11-approximation-algorithms-fig-02.png)
+*Figure 11.2 — Three-template diagram for approximation algorithm design *
 
 ---
 
@@ -80,7 +86,8 @@ Christofides' algorithm (1976) works as follows. Compute the minimum spanning tr
 
 Why 1.5? The MST costs at most `OPT` (the optimal tour is a Hamiltonian cycle, which is a spanning tree plus one edge). The minimum matching on `O` costs at most `OPT/2` (this takes more work to prove, using the fact that the odd-degree vertices can be paired in two ways by traversing the optimal tour, and one of those ways costs at most half the tour). Total: at most `1.5 · OPT`.
 
-<!-- → [IMAGE: step-by-step Christofides walkthrough on a small 6-city metric graph — four panels: (1) the 6-city graph with edge weights; (2) MST highlighted, odd-degree vertices circled; (3) minimum perfect matching on odd-degree vertices added as dashed edges; (4) Eulerian circuit shortcut to Hamiltonian tour with the shortcut edges annotated; annotate the MST cost ≤ OPT and matching cost ≤ OPT/2 arguments at the relevant panels; student should see the algorithm as a physical construction, not just a proof] -->
+![Step-by-step Christofides walkthrough on a small 6-city metric](images/11-approximation-algorithms-fig-03.png)
+*Figure 11.3 — Step-by-step Christofides walkthrough on a small 6-city metric*
 
 Christofides' algorithm held the best-known ratio for metric TSP for over forty years. A 2020 result by Karlin, Klein, and Oveis Gharan broke this for general metrics (to something slightly below 1.5), but the improvement is not yet practical.
 
@@ -92,7 +99,8 @@ The rounding introduces error. Each item's value is reduced by at most Δ. The t
 
 This construction — round to reduce the DP's state space, bound the rounding error — is the general recipe for turning pseudo-polynomial DP into FPTAS whenever the structure permits.
 
-<!-- → [IMAGE: before-and-after diagram for knapsack FPTAS value rounding — left: bar chart of original item values (varying heights); right: same items with values rounded down to nearest multiple of Δ (stepped heights); annotate Δ = ε·v_max/n below; label the gap between original and rounded value on one bar as "≤ Δ per item"; label total error as "≤ n·Δ = ε·v_max"; student should see geometrically why the rounding error is bounded and how it connects to the ε guarantee] -->
+![Before-and-after diagram for knapsack FPTAS value rounding ](images/11-approximation-algorithms-fig-04.png)
+*Figure 11.4 — Before-and-after diagram for knapsack FPTAS value rounding *
 
 ---
 
@@ -110,7 +118,8 @@ This is the content that matters most for applying these algorithms in practice.
 
 The corrective practice: when applying an approximation algorithm, check its assumptions against your problem instance. Benchmark on representative data. Report the typical-case ratio alongside the theoretical worst-case bound. The bound is the floor of the guarantee; the benchmark is the prediction about your specific workload.
 
-<!-- → [CHART: empirical ratio distribution for vertex cover 2-approximation on random Erdős-Rényi graphs — x-axis is empirical ratio (approx/OPT), y-axis is frequency; the distribution should be centered around 1.1–1.3 with no observations near 2.0; annotate the theoretical worst-case bound as a vertical dashed line at x=2; student should see viscerally that the worst-case bound is rarely approached on random instances, grounding Misreading 1 in data rather than assertion] -->
+![Empirical ratio distribution for vertex cover 2-approximation on](images/11-approximation-algorithms-fig-05.png)
+*Figure 11.5 — Empirical ratio distribution for vertex cover 2-approximation on*
 
 ---
 
@@ -340,3 +349,53 @@ study`.
 **Connection to previous chapters:** Uses `Graph` from Chapter 5; the greedy set-cover algorithm is a Chapter 6 callback; the LP-rounding pattern previews Chapter 13.
 
 **Preview of next chapter:** Chapter 12 introduces randomization — Karger's min-cut algorithm, randomized quickselect, locality-sensitive hashing — and asks you to *measure* the concentration of randomized algorithms, which is the property that makes "expected behavior" trustworthy.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 11.1 — Diagram illustrating the approximation contract 
+
+Create a standalone D3 v7 HTML file for Figure Diagram illustrating the approximation contract . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: two-panel diagram illustrating the approximation contract — left panel: number line from OPT to α·OPT, with "algorithm's solution lands somewhere in here" shaded and a question mark indicating the algorithm's actual output position within the range; right panel: two sample instances, one where the algorithm hits near OPT, one where it hits near α·OPT — student should see that the ratio defines the ceiling, not the landing spot. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/11-approximation-algorithms-fig-01.html`
+
+---
+
+### Figure 11.2 — Three-template diagram for approximation algorithm design 
+
+Create a standalone D3 v7 HTML file for Figure Three-template diagram for approximation algorithm design . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: three-template diagram for approximation algorithm design — three horizontal lanes labeled "Greedy + charging", "LP relax + round", "DP round for FPTAS"; each lane contains: (1) the key idea in one sentence, (2) what provides the lower bound for the ratio proof, (3) canonical example problem; arrows connect the canonical example to its ratio; student should be able to match a new algorithm they read about to its design template. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/11-approximation-algorithms-fig-02.html`
+
+---
+
+### Figure 11.3 — Step-by-step Christofides walkthrough on a small 6-city metric
+
+Create a standalone D3 v7 HTML file for Figure Step-by-step Christofides walkthrough on a small 6-city metric. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: step-by-step Christofides walkthrough on a small 6-city metric graph — four panels: (1) the 6-city graph with edge weights; (2) MST highlighted, odd-degree vertices circled; (3) minimum perfect matching on odd-degree vertices added as dashed edges; (4) Eulerian circuit shortcut to Hamiltonian tour with the shortcut edges annotated; annotate the MST cost ≤ OPT and matching cost ≤ OPT/2 arguments at the relevant panels; student should see the algorithm as a physical construction, not just a proof. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/11-approximation-algorithms-fig-03.html`
+
+---
+
+### Figure 11.4 — Before-and-after diagram for knapsack FPTAS value rounding 
+
+Create a standalone D3 v7 HTML file for Figure Before-and-after diagram for knapsack FPTAS value rounding . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: before-and-after diagram for knapsack FPTAS value rounding — left: bar chart of original item values (varying heights); right: same items with values rounded down to nearest multiple of Δ (stepped heights); annotate Δ = ε·v_max/n below; label the gap between original and rounded value on one bar as "≤ Δ per item"; label total error as "≤ n·Δ = ε·v_max"; student should see geometrically why the rounding error is bounded and how it connects to the ε guarantee. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/11-approximation-algorithms-fig-04.html`
+
+---
+
+### Figure 11.5 — Empirical ratio distribution for vertex cover 2-approximation on
+
+Create a standalone D3 v7 HTML file for Figure Empirical ratio distribution for vertex cover 2-approximation on. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: empirical ratio distribution for vertex cover 2-approximation on random Erdős-Rényi graphs — x-axis is empirical ratio (approx/OPT), y-axis is frequency; the distribution should be centered around 1.1–1.3 with no observations near 2.0; annotate the theoretical worst-case bound as a vertical dashed line at x=2; student should see viscerally that the worst-case bound is rarely approached on random instances, grounding Misreading 1 in data rather than assertion. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/11-approximation-algorithms-fig-05.html`

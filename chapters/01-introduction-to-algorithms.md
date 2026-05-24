@@ -28,7 +28,8 @@ Here is another shape this book does not address: "What is the gradient of atten
 
 The boundary matters. Every reference book has one. This one is drawn around the classical algorithms that appear in most software engineering work and almost every algorithms interview, stopping before the territory that belongs to other books.
 
-<!-- → [INFOGRAPHIC: two-region boundary map — "This Book" on the left listing the 13 canonical topics, "Elsewhere" on the right listing ML-era methods, decision theory, and implementation-ready code — visually reinforces the scope argument the prose makes here] -->
+![Two-region boundary map ](images/01-introduction-to-algorithms-fig-01.png)
+*Figure 1.1 — Two-region boundary map *
 
 ---
 
@@ -44,7 +45,8 @@ So: read Chapter 2. Read Chapter 3. Then skip wherever you want.
 
 If you need a refresher on recursion or probability — two topics that come up in Chapters 7 and 12 specifically — those are on the companion page at bearbrown.co rather than in the book itself. The book keeps the probability primer off the main track because most readers do not need it until Chapter 12, and forcing them past it to get to Chapter 4 would be wrong.
 
-<!-- → [CHART: dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine, then Ch4–Ch13 branching off with their prerequisite arrows — reader sees at a glance which chapters depend on which before opening any of them] -->
+![Dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine,](images/01-introduction-to-algorithms-fig-02.png)
+*Figure 1.2 — Dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine,*
 
 ---
 
@@ -62,7 +64,8 @@ Thirteen chapters in four clusters. Here they are.
 
 Linear Programming is last — Chapter 13 — because it is the capstone. It closes threads that Chapters 6, 9, 10, and 11 leave open. By the time you arrive at it, you have enough context to see why it is powerful and what it subsumes.
 
-<!-- → [INFOGRAPHIC: four-cluster architecture diagram — Foundations (Ch1–3), Core Methods (Ch4–8), Optimization (Ch9–11, 13), Probabilistic (Ch12) — rendered as labeled bands or columns, with Ch13 visually anchored as the capstone that bridges back to earlier clusters] -->
+![Four-cluster architecture diagram ](images/01-introduction-to-algorithms-fig-03.png)
+*Figure 1.3 — Four-cluster architecture diagram *
 
 ---
 
@@ -88,7 +91,8 @@ Then cross-references to other chapters, a handoff to the companion page for ext
 
 There are no exercises. No learning objectives written for a course. No chapter-opening hooks designed to create engagement. This is a reference book. The anatomy serves the reference function, not the pedagogy function.
 
-<!-- → [IMAGE: annotated anatomy of a single chapter page — a mock chapter spread with callout labels pointing to each section (TL;DR, Recognition pattern, Decision rules, Worked example, Failure modes) — shows the reader the consistent skeleton they will navigate in every chapter] -->
+![Anatomy of a single chapter page ](images/01-introduction-to-algorithms-fig-04.png)
+*Figure 1.4 — Anatomy of a single chapter page *
 
 ---
 
@@ -129,7 +133,9 @@ Four other books occupy the same territory. Each fits a different reading positi
 
 This book is not a substitute for any of those. It is the cheap, plain-language, fast-lookup reference that complements them.
 
-<!-- → [TABLE: five-column comparison of this book vs. CLRS vs. Sedgewick vs. Skiena vs. Algorithms in a Nutshell — columns: book, price tier, primary use case, format (lookup/textbook/code listings), best for — reader sees at a glance which book to reach for which need] -->
+| book | price tier | primary use case | format (lookup | textbook |
+| --- | --- | --- | --- | --- |
+| five-column comparison of this book vs. CLRS vs. Sedgewick vs. Skiena vs. Algorithms in a Nutshell — | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -274,3 +280,45 @@ ask before defaulting to Python.
 **Connection to previous chapters:** None — this is the seed.
 
 **Preview of next chapter:** Chapter 2 builds the benchmark harness every later chapter uses. The skeleton you just created is where the harness will live.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 1.1 — Two-region boundary map 
+
+Create a standalone D3 v7 HTML file for Figure Two-region boundary map . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: two-region boundary map — "This Book" on the left listing the 13 canonical topics, "Elsewhere" on the right listing ML-era methods, decision theory, and implementation-ready code — visually reinforces the scope argument the prose makes here. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/01-introduction-to-algorithms-fig-01.html`
+
+---
+
+### Figure 1.2 — Dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine,
+
+Create a standalone D3 v7 HTML file for Figure Dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine,. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: dependency graph showing Ch1→Ch2→Ch3 as the mandatory spine, then Ch4–Ch13 branching off with their prerequisite arrows — reader sees at a glance which chapters depend on which before opening any of them. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/01-introduction-to-algorithms-fig-02.html`
+
+---
+
+### Figure 1.3 — Four-cluster architecture diagram 
+
+Create a standalone D3 v7 HTML file for Figure Four-cluster architecture diagram . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: four-cluster architecture diagram — Foundations (Ch1–3), Core Methods (Ch4–8), Optimization (Ch9–11, 13), Probabilistic (Ch12) — rendered as labeled bands or columns, with Ch13 visually anchored as the capstone that bridges back to earlier clusters. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/01-introduction-to-algorithms-fig-03.html`
+
+---
+
+### Figure 1.4 — Anatomy of a single chapter page 
+
+Create a standalone D3 v7 HTML file for Figure Anatomy of a single chapter page . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: annotated anatomy of a single chapter page — a mock chapter spread with callout labels pointing to each section (TL;DR, Recognition pattern, Decision rules, Worked example, Failure modes) — shows the reader the consistent skeleton they will navigate in every chapter. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/01-introduction-to-algorithms-fig-04.html`

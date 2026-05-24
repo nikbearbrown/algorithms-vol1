@@ -27,7 +27,8 @@ This geometric fact is what makes LP tractable. The feasible region might have i
 
 Three outcomes are possible. The LP has a unique optimum at a vertex. Or it has multiple optima — an entire face of the polyhedron achieves the same objective value. Or it has no finite optimum, either because no $\mathbf{x}$ satisfies the constraints (infeasible) or because the objective grows without bound in the feasible direction (unbounded).
 
-<!-- → [IMAGE: 2D LP geometry diagram — a feasible polyhedron (shaded polygon) with two constraints visible as boundary lines, the objective gradient vector c shown, level-set hyperplanes (parallel lines) pushed to the vertex that achieves the maximum, labeled "optimal vertex"; student sees the geometric argument that the optimum lives at a vertex] -->
+![2D LP geometry diagram ](images/13-linear-programming-fig-01.png)
+*Figure 13.1 — 2D LP geometry diagram *
 
 ---
 
@@ -71,7 +72,8 @@ The practical trade-off between simplex and interior-point is warm-starting. Sim
 
 Modern solvers run both and choose automatically.
 
-<!-- → [INFOGRAPHIC: two-panel diagram contrasting simplex (path along the polyhedron boundary, vertex to vertex) and interior-point (curved path through the interior converging to the optimal vertex) — same feasible region, same optimal vertex, visibly different trajectories; student sees why interior-point loses the warm-start advantage] -->
+![Diagram contrasting simplex (path along the polyhedron boundary,](images/13-linear-programming-fig-02.png)
+*Figure 13.2 — Diagram contrasting simplex (path along the polyhedron boundary,*
 
 ---
 
@@ -93,7 +95,8 @@ The dual variables $y_i$ have a direct economic interpretation. They are the *sh
 
 The shadow prices tell you things the primal solution does not. The primal tells you what to do. The dual tells you which constraints are holding you back and by how much. In production planning, shadow prices tell management which capacity constraints are worth expanding. In diet optimization, they tell you which nutritional requirements are binding and what each is costing. In network routing, they relate to the bottleneck edges — and this is exactly where Chapter 9's max-flow min-cut theorem lives: it is a special case of LP duality.
 
-<!-- → [CHART: sensitivity analysis plot — x-axis: right-hand side perturbation of the binding constraint (±20%), y-axis: optimal objective value — a piecewise-linear curve with slope equal to the shadow price in the neighborhood of the original constraint, flattening outside the sensitivity range; student sees the shadow price as a slope and the sensitivity range as the domain over which it holds] -->
+![Sensitivity analysis plot ](images/13-linear-programming-fig-03.png)
+*Figure 13.3 — Sensitivity analysis plot *
 
 ---
 
@@ -115,7 +118,11 @@ The transition from LP to MIP is where most practitioners encounter the computat
 
 The LP relaxation — solving the MIP as an LP by dropping integrality constraints — is the core subroutine of branch-and-bound. Every node in the branch-and-bound tree solves an LP. The LP optimum is an upper bound (for maximization) on the true integer optimum. If the LP optimum happens to be integral, it is the optimal integer solution. If it is fractional, the algorithm branches on a fractional variable, creating two subproblems. LP makes MIP solvable; without LP as the backbone, MIP solving would be hopeless.
 
-<!-- → [TABLE: optimization problem family — columns: problem class, objective type, variable type, complexity, canonical examples, typical solver — rows: LP, IP, MIP, 0-1 IP, QP (convex), QP (non-convex); student sees the full family at a glance and can locate their problem in the right row] -->
+| problem class | objective type | variable type | complexity | canonical examples |
+| --- | --- | --- | --- | --- |
+| LP, IP, MIP, 0-1 IP, QP (convex | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. |
+| QP (non-convex | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. |
+| student sees the full family at a glance and can locate their problem in the right row | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | Use the chapter example as the concrete test case. |
 
 ---
 
@@ -317,3 +324,37 @@ all 13 chapters' deliverables and the cross-references between them.
 **Connection to previous chapters:** Ties back to Chapter 9 (min-cost flow as LP), Chapter 11 (LP relaxation as approximation technique), Chapter 6 (matroid intersection LPs), Chapter 10 (LP relaxation of NP-hard ILPs). The capstone README references the full chapter arc.
 
 **Preview of next chapter:** None — this is the volume's final chapter. The companion repository is now a portfolio-grade artifact. Open issues for what *Vol. 2* (decision-making algorithms: Bayesian methods, optimal stopping, game theory) would add and you have a continuation plan.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 13.1 — 2D LP geometry diagram 
+
+Create a standalone D3 v7 HTML file for Figure 2D LP geometry diagram . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: 2D LP geometry diagram — a feasible polyhedron (shaded polygon) with two constraints visible as boundary lines, the objective gradient vector c shown, level-set hyperplanes (parallel lines) pushed to the vertex that achieves the maximum, labeled "optimal vertex"; student sees the geometric argument that the optimum lives at a vertex. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/13-linear-programming-fig-01.html`
+
+---
+
+### Figure 13.2 — Diagram contrasting simplex (path along the polyhedron boundary,
+
+Create a standalone D3 v7 HTML file for Figure Diagram contrasting simplex (path along the polyhedron boundary,. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: two-panel diagram contrasting simplex (path along the polyhedron boundary, vertex to vertex) and interior-point (curved path through the interior converging to the optimal vertex) — same feasible region, same optimal vertex, visibly different trajectories; student sees why interior-point loses the warm-start advantage. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/13-linear-programming-fig-02.html`
+
+---
+
+### Figure 13.3 — Sensitivity analysis plot 
+
+Create a standalone D3 v7 HTML file for Figure Sensitivity analysis plot . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: sensitivity analysis plot — x-axis: right-hand side perturbation of the binding constraint (±20%), y-axis: optimal objective value — a piecewise-linear curve with slope equal to the shadow price in the neighborhood of the original constraint, flattening outside the sensitivity range; student sees the shadow price as a slope and the sensitivity range as the domain over which it holds. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/13-linear-programming-fig-03.html`

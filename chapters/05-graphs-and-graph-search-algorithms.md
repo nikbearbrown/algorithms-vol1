@@ -10,7 +10,8 @@ The things can be cities, computers, courses, web pages, people, atoms, build ta
 
 That structure has a name. It's called a graph — not in the sense of a chart or a plot, but in the mathematical sense: a set of vertices connected by edges. And the reason graphs matter is not that they're a clever abstraction but that an enormous class of real problems, problems that look completely different on the surface, have exactly the same underlying structure. Once you see that structure, the algorithm follows almost inevitably.
 
-<!-- → [IMAGE: side-by-side panel showing four visually distinct domains — a road map, a social network, a software dependency diagram, a course prerequisite chart — with an arrow pointing to a single abstract graph drawing; student should see the recognition moment: four superficially different problems sharing identical underlying structure] -->
+![Panel showing four visually distinct domains ](images/05-graphs-and-graph-search-algorithms-fig-01.png)
+*Figure 5.1 — Panel showing four visually distinct domains *
 
 ---
 
@@ -32,7 +33,9 @@ The **adjacency matrix** stores a `V × V` grid where entry `[i][j]` holds the w
 
 A third representation, the **edge list**, stores the graph as a flat list of triples: source vertex, destination vertex, weight. It's less convenient for traversal but natural for algorithms that iterate over edges rather than vertices. Bellman-Ford and Kruskal's MST algorithm work this way.
 
-<!-- → [TABLE: three-way comparison of adjacency list, adjacency matrix, and edge list — columns: representation, memory, edge existence query, neighbor iteration, best used when; student should be able to pick the right representation given a problem's graph density and the algorithm's access pattern] -->
+| representation | memory | edge existence query | neighbor iteration | best used when |
+| --- | --- | --- | --- | --- |
+| three-way comparison of adjacency list, adjacency matrix, and edge list — | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -50,7 +53,8 @@ The natural use for DFS is not path-finding but *structure detection*. When DFS 
 
 The choice between BFS and DFS is rarely about performance — both are linear in the size of the graph. It's about what you want to know. Minimum hops, BFS. Structure and ordering, DFS.
 
-<!-- → [IMAGE: the same small graph (8–10 vertices) traversed twice side by side — left panel shows BFS visit order with vertices numbered by discovery, concentric rings radiating from source; right panel shows DFS visit order with vertices numbered, a deep spine extending before backtracking; student should see viscerally why BFS discovers shortest paths and DFS reveals structure] -->
+![The same small graph (8–10 vertices) traversed twice](images/05-graphs-and-graph-search-algorithms-fig-02.png)
+*Figure 5.2 — The same small graph (8–10 vertices) traversed twice*
 
 ---
 
@@ -62,7 +66,8 @@ The interesting algorithms on graphs are the ones that find shortest paths when 
 
 The non-negativity requirement is not a technicality. Here is why it matters. When Dijkstra extracts a vertex from the priority queue, it declares that vertex's distance final — the claim is that no shorter path will be discovered later. This claim holds when all edges are non-negative: you can never find a shorter path to an already-finalized vertex because any extension through positive-weight edges can only increase the cost. With a negative edge, that claim breaks. You could extract a vertex, declare its distance final, and then discover a path through a negative edge that would have been cheaper. Dijkstra has no mechanism to revisit finalized vertices.
 
-<!-- → [IMAGE: small directed graph (4–5 vertices) where Dijkstra produces an incorrect answer — show the graph with one negative edge, annotate which vertex Dijkstra finalizes first and its recorded distance, then show the actual shorter path through the negative edge that Dijkstra missed; student should see the failure mode concretely, not just as a stated constraint] -->
+![Directed graph (4–5 vertices) where Dijkstra produces an](images/05-graphs-and-graph-search-algorithms-fig-03.png)
+*Figure 5.3 — Directed graph (4–5 vertices) where Dijkstra produces an*
 
 **Bellman-Ford** handles single-source shortest paths when edges can be negative. The approach is fundamentally different: instead of greedily extracting the closest vertex, simply iterate over every edge in the graph `|V| − 1` times, relaxing each edge each time. After `|V| − 1` iterations, if no negative cycle exists, all shortest distances are correct. One more pass that relaxes any edge further proves a negative cycle exists.
 
@@ -82,7 +87,8 @@ The classic heuristic for road networks is great-circle distance: the straight-l
 
 The heuristic's quality determines A\*'s advantage. In a maze where straight-line distance is a poor predictor of actual path cost — because walls force long detours — the heuristic informs little and A\* degrades toward Dijkstra. The quality of the heuristic is a claim about the geometry of the problem: whether the shortest path tends to go roughly in the direction of the goal.
 
-<!-- → [IMAGE: two side-by-side grid graphs showing explored vertices for the same source-target pair — left panel Dijkstra (explored region radiates as a roughly circular blob), right panel A* with great-circle heuristic (explored region is a narrow corridor pointing toward the target); annotate the explored vertex counts on each; student should see concretely what "explores 1–10% of vertices" means] -->
+![Two side-by-side grid graphs showing explored vertices for](images/05-graphs-and-graph-search-algorithms-fig-04.png)
+*Figure 5.4 — Two side-by-side grid graphs showing explored vertices for*
 
 ---
 
@@ -102,7 +108,8 @@ Both algorithms are greedy: they always take the locally cheapest option. The pr
 
 **Borůvka's algorithm**, the oldest of the three (1926), has each component independently find its cheapest outgoing edge and merge. Because components work independently, it's naturally parallel. Useful when the graph is too large to process centrally or when parallel hardware is available.
 
-<!-- → [IMAGE: step-by-step construction of an MST on the same 8-vertex weighted graph using Kruskal's algorithm — show the edge list sorted by weight at top, then four stages: initial state (no edges added), after adding cheapest edge, after adding second, after completion; highlight in each stage which edge was considered and whether it was added or rejected (would create cycle); student should see the algorithm as a physical process, not just pseudocode] -->
+![Step-by-step construction of an MST on the same](images/05-graphs-and-graph-search-algorithms-fig-05.png)
+*Figure 5.5 — Step-by-step construction of an MST on the same*
 
 ---
 
@@ -138,7 +145,12 @@ In the pricing-model version, the company has implemented variable toll pricing 
 
 The algorithm changed because the model changed. A change in business requirements — adding a rebate pricing system — changed the graph's properties, which changed the correct algorithm. Reading "Dijkstra is the shortest-path algorithm" without remembering the non-negative-weights precondition is the failure mode. The preconditions are not fine print. They are the definition of what problem the algorithm solves.
 
-<!-- → [TABLE: algorithm selection guide — rows: Dijkstra, Bellman-Ford, Floyd-Warshall, A*, BFS; columns: single-source or all-pairs, negative weights allowed, specific target, unweighted, time complexity; fill each cell with yes/no/N/A and the complexity; student should be able to run down the columns for their problem and arrive at the right row] -->
+| single-source or all-pairs | negative weights allowed | specific target | unweighted | time complexity |
+| --- | --- | --- | --- | --- |
+| Dijkstra, Bellman-Ford, Floyd-Warshall, A*, BFS | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
+| columns: single-source or all-pairs, negative weights allowed, specific target, unweighted, time complexity | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
+| fill each cell with yes | no | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
+| student should be able to run down the columns for their problem and arrive at the right row | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -334,3 +346,53 @@ Commit with `ch05: graphs, traversals, shortest paths, routing demo`.
 **Connection to previous chapters:** Imports `MinHeap` and `UnionFind` from Chapter 3, harness from Chapter 2.
 
 **Preview of next chapter:** Chapter 6 implements interval scheduling, Kruskal's MST (already done!), and Huffman coding — and asks you to prove the exchange argument empirically by constructing adversarial inputs for the alternatives.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 5.1 — Panel showing four visually distinct domains 
+
+Create a standalone D3 v7 HTML file for Figure Panel showing four visually distinct domains . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: side-by-side panel showing four visually distinct domains — a road map, a social network, a software dependency diagram, a course prerequisite chart — with an arrow pointing to a single abstract graph drawing; student should see the recognition moment: four superficially different problems sharing identical underlying structure. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/05-graphs-and-graph-search-algorithms-fig-01.html`
+
+---
+
+### Figure 5.2 — The same small graph (8–10 vertices) traversed twice
+
+Create a standalone D3 v7 HTML file for Figure The same small graph (8–10 vertices) traversed twice. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: the same small graph (8–10 vertices) traversed twice side by side — left panel shows BFS visit order with vertices numbered by discovery, concentric rings radiating from source; right panel shows DFS visit order with vertices numbered, a deep spine extending before backtracking; student should see viscerally why BFS discovers shortest paths and DFS reveals structure. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/05-graphs-and-graph-search-algorithms-fig-02.html`
+
+---
+
+### Figure 5.3 — Directed graph (4–5 vertices) where Dijkstra produces an
+
+Create a standalone D3 v7 HTML file for Figure Directed graph (4–5 vertices) where Dijkstra produces an. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: small directed graph (4–5 vertices) where Dijkstra produces an incorrect answer — show the graph with one negative edge, annotate which vertex Dijkstra finalizes first and its recorded distance, then show the actual shorter path through the negative edge that Dijkstra missed; student should see the failure mode concretely, not just as a stated constraint. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/05-graphs-and-graph-search-algorithms-fig-03.html`
+
+---
+
+### Figure 5.4 — Two side-by-side grid graphs showing explored vertices for
+
+Create a standalone D3 v7 HTML file for Figure Two side-by-side grid graphs showing explored vertices for. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: two side-by-side grid graphs showing explored vertices for the same source-target pair — left panel Dijkstra (explored region radiates as a roughly circular blob), right panel A* with great-circle heuristic (explored region is a narrow corridor pointing toward the target); annotate the explored vertex counts on each; student should see concretely what "explores 1–10% of vertices" means. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/05-graphs-and-graph-search-algorithms-fig-04.html`
+
+---
+
+### Figure 5.5 — Step-by-step construction of an MST on the same
+
+Create a standalone D3 v7 HTML file for Figure Step-by-step construction of an MST on the same. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: step-by-step construction of an MST on the same 8-vertex weighted graph using Kruskal's algorithm — show the edge list sorted by weight at top, then four stages: initial state (no edges added), after adding cheapest edge, after adding second, after completion; highlight in each stage which edge was considered and whether it was added or rejected (would create cycle); student should see the algorithm as a physical process, not just pseudocode. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/05-graphs-and-graph-search-algorithms-fig-05.html`

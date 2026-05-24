@@ -30,7 +30,8 @@ The big open question is whether P equals NP. No proof exists either way. If P =
 
 For working engineers, the practical stance is: assume P ≠ NP. If you find a polynomial-time algorithm for an NP-complete problem, you have either made an error or solved the most famous open problem in mathematics.
 
-<!-- → [INFOGRAPHIC: Venn diagram of P, NP, NP-complete, and NP-hard — P as a circle inside NP, NP-complete as the boundary ring of NP, NP-hard as the region containing NP-complete and extending beyond NP (with the halting problem labeled outside NP); each region labeled with one or two canonical examples] -->
+![Venn diagram of P, NP, NP-complete, and NP-hard](images/10-npcompleteness-and-intractability-fig-01.png)
+*Figure 10.1 — Venn diagram of P, NP, NP-complete, and NP-hard*
 
 ---
 
@@ -52,7 +53,8 @@ The third: there is no obvious structure to exploit. Chapter 9 showed that netwo
 
 Worth checking before concluding NP-hardness: many problems that look hard are in P because a non-obvious polynomial algorithm exists. 2-SAT is solvable in linear time; 3-SAT is NP-hard. Maximum weight matching in bipartite graphs is polynomial; in general graphs it is harder but still polynomial. Graph coloring with 2 colors is polynomial (bipartiteness); with 3 or more it is NP-hard. The difference of one variable in a problem's structure can move it from P to NP-complete.
 
-<!-- → [CHART: reduction graph showing 3-SAT at the top with directed arrows to vertex cover, independent set, clique, graph coloring, subset sum, set cover, and TSP — each arrow labeled with a one-phrase description of the reduction; reader sees the canonical scaffolding at a glance] -->
+![Reduction graph showing 3-SAT at the top with](images/10-npcompleteness-and-intractability-fig-02.png)
+*Figure 10.2 — Reduction graph showing 3-SAT at the top with*
 
 ---
 
@@ -82,7 +84,10 @@ The full catalog has thousands of entries. The working engineer needs perhaps tw
 
 **Integer linear programming.** Optimize a linear objective over linear constraints where variables must take integer values. NP-hard in general. Special structure (totally unimodular matrices) makes certain ILP instances polynomial — Chapter 13 covers this.
 
-<!-- → [TABLE: catalog of NP-complete problems — columns: problem, decision version, best known exact bound, best approximation ratio, special tractable cases — one row per problem listed above; reader sees all eleven at once for comparison and lookup] -->
+| problem | decision version | best known exact bound | best approximation ratio | special tractable cases — one row per problem listed above |
+| --- | --- | --- | --- | --- |
+| cases | one row per problem listed above | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
+| reader sees all eleven at once for comparison and lookup | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -104,7 +109,8 @@ This is the chapter's most important section. NP-completeness is not a verdict. 
 
 **Be aware of phase transitions.** Many NP-hard problems show a phase transition — a critical density or parameter value below which instances are easy (almost certainly satisfiable or solvable) and above which they are also easy (almost certainly unsatisfiable or infeasible), with a narrow hard region near the transition. For 3-SAT, the hard region is near a clause-to-variable ratio of approximately 4.26. Random instances near this ratio are notoriously difficult; instances far from it are not. If your real instances cluster away from the phase transition, the worst-case bound is a poor predictor of your wall-clock time.
 
-<!-- → [CHART: 3-SAT phase transition — x-axis: clause-to-variable ratio, y-axis: solver time (log scale) — sharp peak near ratio 4.26, with "easy-satisfiable" region left and "easy-unsatisfiable" region right labeled; student sees the phase transition visually and understands why the hard region is narrow] -->
+![3-SAT phase transition ](images/10-npcompleteness-and-intractability-fig-03.png)
+*Figure 10.3 — 3-SAT phase transition *
 
 ---
 
@@ -124,7 +130,8 @@ The resulting schedule has conflicts. A faculty member assigned to two simultane
 
 Three lessons from this example. First, NP-hard problems are routinely solved on the instances that actually arise in practice. Second, the engineering approach is almost never pure optimization from scratch — it is incremental, heuristic, iterated, and problem-specific. Third, the hardness is not a reason to stop. It is a reason to choose carefully among the seven options listed above.
 
-<!-- → [IMAGE: course-scheduling conflict graph — small example with 8 courses as vertices, edges drawn between courses sharing at least one student, and a valid 3-coloring shown with colored vertices — student sees the reduction made concrete, not just described] -->
+![Course-scheduling conflict graph ](images/10-npcompleteness-and-intractability-fig-04.png)
+*Figure 10.4 — Course-scheduling conflict graph *
 
 ---
 
@@ -281,3 +288,45 @@ Commit with `ch10: NP-hard strategy comparison on graph coloring`.
 **Connection to previous chapters:** Uses `Graph` from Chapter 5; the greedy first-fit reuses ideas from Chapter 6; harness from Chapter 2.
 
 **Preview of next chapter:** Chapter 11 implements approximation algorithms with known ratios — set cover (greedy ln(n) bound), vertex cover (2-approximation) — and asks: does the worst-case ratio actually show up on real instances?
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 10.1 — Venn diagram of P, NP, NP-complete, and NP-hard
+
+Create a standalone D3 v7 HTML file for Figure Venn diagram of P, NP, NP-complete, and NP-hard. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: Venn diagram of P, NP, NP-complete, and NP-hard — P as a circle inside NP, NP-complete as the boundary ring of NP, NP-hard as the region containing NP-complete and extending beyond NP (with the halting problem labeled outside NP); each region labeled with one or two canonical examples. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/10-npcompleteness-and-intractability-fig-01.html`
+
+---
+
+### Figure 10.2 — Reduction graph showing 3-SAT at the top with
+
+Create a standalone D3 v7 HTML file for Figure Reduction graph showing 3-SAT at the top with. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: reduction graph showing 3-SAT at the top with directed arrows to vertex cover, independent set, clique, graph coloring, subset sum, set cover, and TSP — each arrow labeled with a one-phrase description of the reduction; reader sees the canonical scaffolding at a glance. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/10-npcompleteness-and-intractability-fig-02.html`
+
+---
+
+### Figure 10.3 — 3-SAT phase transition 
+
+Create a standalone D3 v7 HTML file for Figure 3-SAT phase transition . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: 3-SAT phase transition — x-axis: clause-to-variable ratio, y-axis: solver time (log scale) — sharp peak near ratio 4.26, with "easy-satisfiable" region left and "easy-unsatisfiable" region right labeled; student sees the phase transition visually and understands why the hard region is narrow. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/10-npcompleteness-and-intractability-fig-03.html`
+
+---
+
+### Figure 10.4 — Course-scheduling conflict graph 
+
+Create a standalone D3 v7 HTML file for Figure Course-scheduling conflict graph . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: course-scheduling conflict graph — small example with 8 courses as vertices, edges drawn between courses sharing at least one student, and a valid 3-coloring shown with colored vertices — student sees the reduction made concrete, not just described. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/10-npcompleteness-and-intractability-fig-04.html`

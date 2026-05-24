@@ -32,7 +32,8 @@ where `a` is the number of recursive calls, `b` is the factor by which input shr
 
 Karatsuba's recurrence is `T(n) = 3T(n/2) + n`, giving `T(n) = Θ(n^(log_2 3)) ≈ Θ(n^1.585)`. The schoolbook algorithm's recurrence is `T(n) = 4T(n/2) + n`, giving `T(n) = Θ(n^2)`. One recursive call fewer per level — three products instead of four — compounds across all `log n` levels of recursion into a genuinely different asymptotic bound. That compounding is what divide and conquer buys.
 
-<!-- → [CHART: recursion tree for Karatsuba (a=3, b=2) vs. schoolbook multiplication (a=4, b=2) — two trees side by side, same depth, showing how one fewer subproblem per level compounds to a different exponent at the leaves; student sees why the difference between 3 and 4 subproblems produces n^1.585 vs. n^2] -->
+![Recursion tree for Karatsuba (a=3, b=2) vs](images/07-divide-and-conquer-strategies-fig-01.png)
+*Figure 7.1 — Recursion tree for Karatsuba (a=3, b=2) vs*
 
 ---
 
@@ -64,7 +65,9 @@ The third signal is a combine step cheaper than solving from scratch. If combini
 
 **Fast Fourier Transform (FFT)** computes the discrete Fourier transform of `n` samples in `O(n log n)` rather than `O(n²)`. The divide step splits by parity — even-indexed and odd-indexed samples. The combine step uses roots of unity. Cooley and Tukey published the modern form in 1965, though earlier versions existed. The FFT is foundational for signal processing, polynomial multiplication, and large-integer multiplication (at digit counts where Karatsuba's `n^1.585` is still too slow). A full treatment requires complex numbers and the algebra of roots of unity; the companion page carries a worked walkthrough.
 
-<!-- → [TABLE: canonical D&C algorithms — columns: algorithm, recurrence, bound, combine-step cost, key constraint — one row per algorithm (merge sort, quicksort, quickselect, Karatsuba, Strassen, closest pair, FFT); student sees the full catalog and can compare what each one is trading off at a glance] -->
+| algorithm | recurrence | bound | combine-step cost | key constraint — one row per algorithm (merge sort |
+| --- | --- | --- | --- | --- |
+| canonical D&C algorithms — | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. | A concrete checkpoint for applying the chapter concept. |
 
 ---
 
@@ -90,7 +93,8 @@ Recurrence: `T(n) = 2T(n/2) + O(n)`. By the master theorem: `T(n) = O(n log n)`.
 
 The pattern is the same as Karatsuba's. The cleverness is not in the recursion; the recursion is mechanical. The cleverness is in the combine step: the geometric argument that a `2δ × δ` box can contain at most a constant number of points, which turns a potentially quadratic strip scan into a linear one.
 
-<!-- → [IMAGE: closest-pair strip diagram — vertical dividing line with δ-wide strip highlighted on each side; a 2δ × δ box shown around a sample point p; the 7-point packing argument illustrated with labeled example points in the box; student sees why the strip scan cannot be quadratic] -->
+![Closest-pair strip diagram ](images/07-divide-and-conquer-strategies-fig-02.png)
+*Figure 7.2 — Closest-pair strip diagram *
 
 ---
 
@@ -112,7 +116,8 @@ Fourth, an expensive combine step cancels the asymptotic win. If finding the med
 
 The corrective discipline is mechanical: write the recurrence `T(n) = aT(n/b) + f(n)` explicitly. Verify `b > 1`. Verify the combine step is correct and complete. Apply the master theorem to predict the bound. Compare the bound to the iterative alternative. If the bound is not better, reconsider whether the subproblems are actually independent and the structure is actually self-similar.
 
-<!-- → [INFOGRAPHIC: four-panel failure-mode diagnostic — each panel shows a failing recurrence shape: (1) T(n)=T(n-1)+O(1) [shrinks by one], (2) T(n)=2T(n-1)+... [exponential overlap], (3) T(n)=T(n-1)+n [unbalanced], (4) T(n)=2T(n/2)+n² [expensive combine] — with the resulting bound and the fix labeled for each] -->
+![Four-panel failure-mode diagnostic ](images/07-divide-and-conquer-strategies-fig-03.png)
+*Figure 7.3 — Four-panel failure-mode diagnostic *
 
 ---
 
@@ -255,3 +260,37 @@ verification`.
 **Connection to previous chapters:** Imports `harness` from Chapter 2; reuses the merge-sort understanding from Chapter 4 but reframes it under master-theorem analysis.
 
 **Preview of next chapter:** Chapter 8 implements dynamic programming — LCS, edit distance, knapsack — with both top-down memoization and bottom-up tabulation, and measures the memory difference space optimization buys.
+
+## Prompts
+
+Use these prompts with Claude to generate interactive D3 v7 versions of the
+figures in this chapter. Each produces a standalone HTML file you can open
+in a browser and modify freely.
+
+**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
+your Claude project context before using these prompts. They define the stack,
+naming conventions, color system, and typography the figures use.
+
+---
+
+### Figure 7.1 — Recursion tree for Karatsuba (a=3, b=2) vs
+
+Create a standalone D3 v7 HTML file for Figure Recursion tree for Karatsuba (a=3, b=2) vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: recursion tree for Karatsuba (a=3, b=2) vs. schoolbook multiplication (a=4, b=2) — two trees side by side, same depth, showing how one fewer subproblem per level compounds to a different exponent at the leaves; student sees why the difference between 3 and 4 subproblems produces n^1.585 vs. n^2. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/07-divide-and-conquer-strategies-fig-01.html`
+
+---
+
+### Figure 7.2 — Closest-pair strip diagram 
+
+Create a standalone D3 v7 HTML file for Figure Closest-pair strip diagram . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: closest-pair strip diagram — vertical dividing line with δ-wide strip highlighted on each side; a 2δ × δ box shown around a sample point p; the 7-point packing argument illustrated with labeled example points in the box; student sees why the strip scan cannot be quadratic. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/07-divide-and-conquer-strategies-fig-02.html`
+
+---
+
+### Figure 7.3 — Four-panel failure-mode diagnostic 
+
+Create a standalone D3 v7 HTML file for Figure Four-panel failure-mode diagnostic . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: four-panel failure-mode diagnostic — each panel shows a failing recurrence shape: (1) T(n)=T(n-1)+O(1) [shrinks by one], (2) T(n)=2T(n-1)+... [exponential overlap], (3) T(n)=T(n-1)+n [unbalanced], (4) T(n)=2T(n/2)+n² [expensive combine] — with the resulting bound and the fix labeled for each. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
+
+> Reference implementation: `d3/07-divide-and-conquer-strategies-fig-03.html`

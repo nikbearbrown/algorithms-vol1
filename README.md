@@ -1,6 +1,6 @@
 # Algorithms by Bear, Vol. 1
 
-**Author:** Nik Bear Brown
+**Author:** Humanitarians AI
 
 **Folder:** `books/algorithms-vol1-with-llms/`
 
