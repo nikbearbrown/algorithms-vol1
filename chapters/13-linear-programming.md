@@ -324,37 +324,3 @@ all 13 chapters' deliverables and the cross-references between them.
 **Connection to previous chapters:** Ties back to Chapter 9 (min-cost flow as LP), Chapter 11 (LP relaxation as approximation technique), Chapter 6 (matroid intersection LPs), Chapter 10 (LP relaxation of NP-hard ILPs). The capstone README references the full chapter arc.
 
 **Preview of next chapter:** None — this is the volume's final chapter. The companion repository is now a portfolio-grade artifact. Open issues for what *Vol. 2* (decision-making algorithms: Bayesian methods, optimal stopping, game theory) would add and you have a continuation plan.
-
-## Prompts
-
-Use these prompts with Claude to generate interactive D3 v7 versions of the
-figures in this chapter. Each produces a standalone HTML file you can open
-in a browser and modify freely.
-
-**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
-your Claude project context before using these prompts. They define the stack,
-naming conventions, color system, and typography the figures use.
-
----
-
-### Figure 13.1 — 2D LP geometry diagram 
-
-Create a standalone D3 v7 HTML file for Figure 2D LP geometry diagram . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: 2D LP geometry diagram — a feasible polyhedron (shaded polygon) with two constraints visible as boundary lines, the objective gradient vector c shown, level-set hyperplanes (parallel lines) pushed to the vertex that achieves the maximum, labeled "optimal vertex"; student sees the geometric argument that the optimum lives at a vertex. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
-
-> Reference implementation: `d3/13-linear-programming-fig-01.html`
-
----
-
-### Figure 13.2 — Diagram contrasting simplex (path along the polyhedron boundary,
-
-Create a standalone D3 v7 HTML file for Figure Diagram contrasting simplex (path along the polyhedron boundary,. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: two-panel diagram contrasting simplex (path along the polyhedron boundary, vertex to vertex) and interior-point (curved path through the interior converging to the optimal vertex) — same feasible region, same optimal vertex, visibly different trajectories; student sees why interior-point loses the warm-start advantage. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
-
-> Reference implementation: `d3/13-linear-programming-fig-02.html`
-
----
-
-### Figure 13.3 — Sensitivity analysis plot 
-
-Create a standalone D3 v7 HTML file for Figure Sensitivity analysis plot . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: sensitivity analysis plot — x-axis: right-hand side perturbation of the binding constraint (±20%), y-axis: optimal objective value — a piecewise-linear curve with slope equal to the shadow price in the neighborhood of the original constraint, flattening outside the sensitivity range; student sees the shadow price as a slope and the sensitivity range as the domain over which it holds. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
-
-> Reference implementation: `d3/13-linear-programming-fig-03.html`

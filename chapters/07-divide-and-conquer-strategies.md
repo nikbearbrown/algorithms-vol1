@@ -260,37 +260,3 @@ verification`.
 **Connection to previous chapters:** Imports `harness` from Chapter 2; reuses the merge-sort understanding from Chapter 4 but reframes it under master-theorem analysis.
 
 **Preview of next chapter:** Chapter 8 implements dynamic programming — LCS, edit distance, knapsack — with both top-down memoization and bottom-up tabulation, and measures the memory difference space optimization buys.
-
-## Prompts
-
-Use these prompts with Claude to generate interactive D3 v7 versions of the
-figures in this chapter. Each produces a standalone HTML file you can open
-in a browser and modify freely.
-
-**Prerequisites:** Load `brutalist/CLAUDE.md` and `brutalist/DESIGN.md` into
-your Claude project context before using these prompts. They define the stack,
-naming conventions, color system, and typography the figures use.
-
----
-
-### Figure 7.1 — Recursion tree for Karatsuba (a=3, b=2) vs
-
-Create a standalone D3 v7 HTML file for Figure Recursion tree for Karatsuba (a=3, b=2) vs. Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: recursion tree for Karatsuba (a=3, b=2) vs. schoolbook multiplication (a=4, b=2) — two trees side by side, same depth, showing how one fewer subproblem per level compounds to a different exponent at the leaves; student sees why the difference between 3 and 4 subproblems produces n^1.585 vs. n^2. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
-
-> Reference implementation: `d3/07-divide-and-conquer-strategies-fig-01.html`
-
----
-
-### Figure 7.2 — Closest-pair strip diagram 
-
-Create a standalone D3 v7 HTML file for Figure Closest-pair strip diagram . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: closest-pair strip diagram — vertical dividing line with δ-wide strip highlighted on each side; a 2δ × δ box shown around a sample point p; the 7-point packing argument illustrated with labeled example points in the box; student sees why the strip scan cannot be quadratic. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
-
-> Reference implementation: `d3/07-divide-and-conquer-strategies-fig-02.html`
-
----
-
-### Figure 7.3 — Four-panel failure-mode diagnostic 
-
-Create a standalone D3 v7 HTML file for Figure Four-panel failure-mode diagnostic . Use the CDN https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js, inline CSS, ResizeObserver redraw, SVG role="img", aria-labelledby, title, and desc. Build the figure from this structural brief: four-panel failure-mode diagnostic — each panel shows a failing recurrence shape: (1) T(n)=T(n-1)+O(1) [shrinks by one], (2) T(n)=2T(n-1)+... [exponential overlap], (3) T(n)=T(n-1)+n [unbalanced], (4) T(n)=2T(n/2)+n² [expensive combine] — with the resulting bound and the fix labeled for each. Use the described data shape and labels; when exact values are not supplied, use plausible illustrative values that preserve the relationships in the brief. Use a zero baseline for bars or areas, direct labels where possible, and annotations named in the brief. Use only DESIGN.md color variables and the required serif/mono font split.
-
-> Reference implementation: `d3/07-divide-and-conquer-strategies-fig-03.html`
