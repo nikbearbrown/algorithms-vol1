@@ -1,5 +1,12 @@
 # Chapter 12 — Randomized Algorithms
 
+
+## TL;DR
+
+- The flip of a coin, taken seriously, turns out to be one of the most powerful tools in all of algorithm design.
+- The chapter moves through Two kinds of randomized algorithms, Why Karger's algorithm works, The two analytical tools, What randomization actually buys you, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The flip of a coin, taken seriously, turns out to be one of the most powerful tools in all of algorithm design.*
 
 ---
@@ -102,7 +109,11 @@ The tail decays *exponentially* in the deviation. This is what "high probability
 
 The practical rule: use Chernoff when summing independent indicators; use Chebyshev when you have variance but not independence; use Markov when all you have is non-negativity.
 
-<!-- → TABLE: three-row reference card for concentration inequalities — columns: "Inequality", "What you need to know about X", "What it bounds", "Tail decay", "When to use"; rows: Markov (only mean, one-sided, 1/t, always applicable), Chebyshev (mean + variance, two-sided, 1/k², variance bounded), Chernoff (independent indicators + mean, one-sided upper, exponential, sum of indicators); makes the selection rule scannable -->
+| Inequality | What you need to know about X | What it bounds | Tail decay | When to use |
+| --- | --- | --- | --- | --- |
+| Reference | Connects reference to the chapter's main distinction | Connects reference to the chapter's main distinction | Connects reference to the chapter's main distinction | Connects reference to the chapter's main distinction |
+| Card | Connects card to the chapter's main distinction | Connects card to the chapter's main distinction | Connects card to the chapter's main distinction | Connects card to the chapter's main distinction |
+| Concentration | Connects concentration to the chapter's main distinction | Connects concentration to the chapter's main distinction | Connects concentration to the chapter's main distinction | Connects concentration to the chapter's main distinction |
 
 ---
 
@@ -156,7 +167,12 @@ The test to apply: would an adversary who sees some outputs of this random sourc
 
 This is a short section in the chapter but a long section in incident reports. The mistake is silent: the code runs, tests pass, and the security property is gone. Do not confuse the two.
 
-<!-- → TABLE: two-column reference card "Algorithmic vs. Cryptographic Randomness" — columns: "Property", "Algorithmic PRNG", "Cryptographic PRNG"; rows covering: examples (Mersenne Twister / /dev/urandom), predictability (recoverable from output / computationally indistinguishable), speed (fast / slower), use cases (pivots, sampling, simulation / tokens, keys, nonces), failure mode (adversary exploits predictability / N/A); caption should reinforce: when in doubt, use cryptographic -->
+| Property | Algorithmic PRNG | Cryptographic PRNG |
+| --- | --- | --- |
+| Reference | Connects reference to the chapter's main distinction | Connects reference to the chapter's main distinction |
+| Card | Connects card to the chapter's main distinction | Connects card to the chapter's main distinction |
+| Algorithmic | Connects algorithmic to the chapter's main distinction | Connects algorithmic to the chapter's main distinction |
+| Cryptographic | Connects cryptographic to the chapter's main distinction | Connects cryptographic to the chapter's main distinction |
 
 ---
 

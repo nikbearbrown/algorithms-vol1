@@ -1,5 +1,12 @@
 # Chapter 1 — Introduction to Algorithms
 
+
+## TL;DR
+
+- There is a moment every engineer knows.
+- The chapter moves through What kind of question this book answers, What you need before you start, How the book is shaped, How each chapter is shaped, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The map before the territory.*
 
 ---

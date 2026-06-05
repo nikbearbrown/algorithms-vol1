@@ -1,5 +1,12 @@
 # Chapter 7 — Divide and Conquer Strategies
 
+
+## TL;DR
+
+- The cleverness lives in the combine step, not the recursion.
+- The chapter moves through The shape of the technique, What makes a problem divide-and-conquer shaped, The canonical algorithms, Closest pair of points: the chapter's worked example, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The cleverness lives in the combine step, not the recursion.*
 
 ---

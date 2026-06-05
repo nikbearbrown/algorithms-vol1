@@ -1,5 +1,12 @@
 # Chapter 13 — Linear Programming
 
+
+## TL;DR
+
+- The most powerful tool you are not using is the one that has been running the world's supply chains since 1947.
+- The chapter moves through What the problem looks like, The recognition pattern, Simplex: the algorithm that finds the vertex, Interior-point methods: the polynomial-time alternative, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The most powerful tool you are not using is the one that has been running the world's supply chains since 1947.*
 
 ---

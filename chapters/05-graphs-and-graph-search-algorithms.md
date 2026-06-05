@@ -1,5 +1,12 @@
 # Chapter 5 — Graphs and Graph Search Algorithms
 
+
+## TL;DR
+
+- What it means to ask "can I get there from here?
+- The chapter moves through What a Graph Actually Is, The Two Fundamental Traversals, Shortest Paths: Four Algorithms, Four Situations, Minimum Spanning Trees, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *What it means to ask "can I get there from here?"*
 
 ---

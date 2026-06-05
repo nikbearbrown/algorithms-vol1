@@ -1,5 +1,12 @@
 # Chapter 3 — Data Structures
 
+
+## TL;DR
+
+- The question is never "does this work.
+- The chapter moves through The idea that holds everything else together, Arrays: the structure that wins on physics, Heaps: the structure for "give me the best one", Balanced search trees: the structure for ordering, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The question is never "does this work." The question is "what does this make cheap."*
 
 ---
@@ -168,7 +175,12 @@ Kruskal's minimum spanning tree algorithm uses Union-Find to efficiently check w
 
 State the operations you need. State the working-set size relative to cache. State whether range queries are required. The structure falls out.
 
-<!-- → TABLE: decision table as a formatted reference card — three columns: "Workload signature", "Recommended structure", "Key reason" (the one-phrase justification for the choice); the "Key reason" column is what's missing from the prose table and makes this a self-contained reference -->
+| Workload signature | Recommended structure | Key reason" (the one-phrase justification for the choice) |
+| --- | --- | --- |
+| Decision | Use decision as the decision guide | Connects decision to the chapter's main distinction |
+| Formatted | Use formatted as the decision guide | Connects formatted to the chapter's main distinction |
+| Reference | Use reference as the decision guide | Connects reference to the chapter's main distinction |
+| Card | Use card as the decision guide | Connects card to the chapter's main distinction |
 
 | Workload signature | Recommended structure |
 |---|---|

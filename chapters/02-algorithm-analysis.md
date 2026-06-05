@@ -1,5 +1,12 @@
 # Chapter 2 — Algorithm Analysis
 
+
+## TL;DR
+
+- What it means to say one way of doing something is better than another.
+- The chapter moves through The Thing You're Actually Measuring, Three Notations, Three Questions, The Standard Growth Rates, What Recursion Costs, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *What it means to say one way of doing something is better than another.*
 
 ---

@@ -1,5 +1,12 @@
 # Chapter 8 — Dynamic Programming
 
+
+## TL;DR
+
+- What it means to remember what you've already figured out.
+- The chapter moves through The Two Properties You're Looking For, How to Design a Recurrence, Top-Down and Bottom-Up, The Idea, Made Concrete: Edit Distance, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *What it means to remember what you've already figured out.*
 
 ---

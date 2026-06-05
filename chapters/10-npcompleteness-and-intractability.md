@@ -1,5 +1,12 @@
 # Chapter 10 — NP-Completeness and Intractability
 
+
+## TL;DR
+
+- The hardest problems are not impossible.
+- The chapter moves through Four classes, and why the distinctions matter, How to recognize NP-completeness, The catalog of hard problems, What to do about it, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The hardest problems are not impossible. They are hard in a precise sense, and the precise sense matters.*
 
 ---

@@ -1,5 +1,12 @@
 # Chapter 11 — Approximation Algorithms
 
+
+## TL;DR
+
+- What it means to be provably close to the right answer.
+- The chapter moves through The Contract, A Hierarchy of Guarantees, Three Design Techniques, The Four Canonical Problems, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *What it means to be provably close to the right answer.*
 
 ---

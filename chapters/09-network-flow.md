@@ -1,5 +1,12 @@
 # Chapter 9 — Network Flow
 
+
+## TL;DR
+
+- The same mathematics that moves water through pipes moves workers to jobs, pixels to labels, and money through constraints.
+- The chapter moves through The model, Why max-flow equals min-cut, The residual graph, Three algorithms, one framework, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The same mathematics that moves water through pipes moves workers to jobs, pixels to labels, and money through constraints. Once you can see the shape, you have the whole toolbox.*
 
 ---

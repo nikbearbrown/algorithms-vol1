@@ -1,5 +1,12 @@
 # Chapter 4 — Sorting and Caching
 
+
+## TL;DR
+
+- The memory hierarchy is the physics.
+- The chapter moves through The lower bound and what it does not tell you, The classical algorithms and what each one is actually for, Why production sorts hybridize, Caching and the same problem in different clothing, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The memory hierarchy is the physics. The algorithm is the engineering.*
 
 ---

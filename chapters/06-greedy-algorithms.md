@@ -1,5 +1,12 @@
 # Chapter 6 — Greedy Algorithms
 
+
+## TL;DR
+
+- The locally best choice, taken at every step, sometimes wins everything.
+- The chapter moves through What a greedy algorithm actually is, The meeting puzzle, resolved, The exchange argument, The lower-bound template, and related ideas.
+- Read it for the main argument, the vocabulary it introduces, and the practical judgment it asks you to develop.
+
 *The locally best choice, taken at every step, sometimes wins everything. The question is when.*
 
 ---
